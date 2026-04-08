@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitor de Calor – Frota</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #f1f5f9;
+            --side: #ffffff;
+            --border: #e2e8f0;
+            --accent: #0ea5e9;
+            --warn: #f59e0b;
+            --danger: #ef4444;
+            --text: #0f172a;
+            --muted: #64748b;
+        }
+        body { display: flex; height: 100vh; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #sidebar { width: 310px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 8px rgba(0,0,0,0.07); }
+        .header { padding: 16px 20px; background: #0f172a; }
+        .header h1 { font-size: 0.95rem; color: #38bdf8; letter-spacing: 2px; font-weight: 700; }
+        .header .subtitle { font-size: 0.68rem; color: #64748b; margin-top: 3px; letter-spacing: 1px; }
+        #statusBar { padding: 8px 16px; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; flex-shrink: 0; }
+        .dot.error { background: var(--danger); animation: none; }
+        .dot.ok { background: #22c55e; animation: none; }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+        #statusText { font-size: 0.72rem; color: var(--muted); }
+        #stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+        .stat { background: #fff; padding: 10px 8px; text-align: center; }
+        .stat .val { font-size: 1.2rem; font-weight: 800; }
+        .stat .lbl { font-size: 0.62rem; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat .val.blue { color: var(--accent); }
+        .stat .val.yellow { color: var(--warn); }
+        .stat .val.red { color: var(--danger); }
+        #searchBox { padding: 10px 14px; background: #f8fafc; border: none; border-bottom: 1px solid var(--border); color: var(--text); width: 100%; font-size: 0.8rem; outline: none; }
+        #searchBox::placeholder { color: #94a3b8; }
+        .list { overflow-y: auto; flex: 1; }
+        .list::-webkit-scrollbar { width: 4px; }
+        .list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .card { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 10px; }
+        .card:hover { background: #f0f9ff; }
+        .card.ativo { background: #e0f2fe; border-left: 3px solid #0ea5e9; }
+        .card-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .card-info { flex: 1; min-width: 0; }
+        .card b { font-size: 0.84rem; color: #0f172a; display: block; }
+        .card span { font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .card-dias { font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 99px; flex-shrink: 0; }
+
+        /* Ícone de cobertura no card */
+        .card-cobertura { font-size: 0.65rem; flex-shrink: 0; }
+
+        /* Painel lateral de detalhe */
+        #painel { display: none; position: absolute; bottom: 0; left: 310px; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 12px 12px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.12); z-index: 2000; padding: 0; max-height: 70vh; overflow-y: auto; }
+        #painel-header { background: #0f172a; border-radius: 12px 12px 0 0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+        #painel-placa { font-size: 1rem; font-weight: 800; color: #fff; }
+        #painel-fechar { background: none; border: none; color: #64748b; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
+        #painel-fechar:hover { color: #fff; }
+        #painel-body { padding: 14px 16px; }
+        .painel-row { font-size: 0.78rem; color: #475569; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        .painel-row b { color: #0f172a; }
+        .painel-secao { font-size: 0.65rem; font-weight: 700; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 6px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+        .erb-tec { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; margin: 2px; }
+        .erb-grid { display: flex; flex-wrap: wrap; margin-bottom: 6px; }
+        .erb-operadora { font-size: 0.7rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; margin: 2px 0; color: #334155; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .erb-loading { font-size: 0.75rem; color: #94a3b8; font-style: italic; }
+        .erb-nenhuma { font-size: 0.75rem; color: #ef4444; font-weight: 600; }
+        .erb-ok { font-size: 0.75rem; color: #22c55e; font-weight: 600; }
+
+        /* Badge de cobertura */
+        .badge-cobertura { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; margin-bottom: 8px; }
+        .badge-sim { background: #dcfce7; color: #16a34a; }
+        .badge-nao { background: #fee2e2; color: #dc2626; }
+
+        #map { flex: 1; }
+        #legend { position: absolute; bottom: 30px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.95); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+        #legend h4 { color: #0f172a; margin-bottom: 8px; font-size: 0.68rem; letter-spacing: 1px; text-transform: uppercase; }
+        .leg-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: #475569; }
+        .leg-color { width: 28px; height: 6px; border-radius: 3px; }
+        #retryBtn { display: none; margin: 8px 16px; padding: 7px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+        #retryBtn:hover { opacity: 0.85; }
+
+        /* Debug painel */
+        #debugInfo { position: absolute; top: 10px; right: 10px; z-index: 9999; background: rgba(15,23,42,0.9); color: #94a3b8; font-size: 0.65rem; padding: 8px 12px; border-radius: 8px; max-width: 300px; display: none; }
+
+        .leaflet-popup-content-wrapper { border-radius: 10px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <div class="header">
+        <h1>🔥 MONITOR DE CALOR</h1>
+        <div class="subtitle">FROTA OFFLINE · COBERTURA DE REDE</div>
+    </div>
+    <div id="statusBar">
+        <div class="dot" id="dot"></div>
+        <span id="statusText">Carregando dados...</span>
+    </div>
+    <button id="retryBtn" onclick="carregar()">↻ Tentar novamente</button>
+    <div id="stats">
+        <div class="stat"><div class="val blue" id="sTotal">—</div><div class="lbl">Total</div></div>
+        <div class="stat"><div class="val yellow" id="sMedio">—</div><div class="lbl">2–7 dias</div></div>
+        <div class="stat"><div class="val red" id="sCritico">—</div><div class="lbl">&gt;7 dias</div></div>
+    </div>
+    <input id="searchBox" type="text" placeholder="🔍  Buscar placa ou município..." oninput="filtrarLista(this.value)">
+    <div class="list" id="unit-list">
+        <div style="padding:30px;text-align:center;color:#94a3b8;font-size:0.8rem">Aguardando dados...</div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<div id="painel">
+    <div id="painel-header">
+        <span id="painel-placa">—</span>
+        <button id="painel-fechar" onclick="fecharPainel()">✕</button>
+    </div>
+    <div id="painel-body">
+        <div class="erb-loading">Clique em um veículo para ver detalhes</div>
+    </div>
+</div>
+
+<div id="legend">
+    <h4>Dias offline</h4>
+    <div class="leg-item"><div class="leg-color" style="background:#0ea5e9"></div> Recente (≤2 dias)</div>
+    <div class="leg-item"><div class="leg-color" style="background:#f59e0b"></div> Médio (2–7 dias)</div>
+    <div class="leg-item"><div class="leg-color" style="background:#ef4444"></div> Crítico (&gt;7 dias)</div>
+    <div style="border-top:1px solid #e2e8f0;margin-top:8px;padding-top:8px;">
+        <div class="leg-item"><div style="width:12px;height:12px;border-radius:50%;background:#22c55e;flex-shrink:0"></div> Com cobertura</div>
+        <div class="leg-item"><div style="width:12px;height:12px;border-radius:50%;background:#6b7280;flex-shrink:0"></div> Sem cobertura</div>
+    </div>
+    <div style="border-top:1px solid #e2e8f0;margin-top:8px;padding-top:8px;font-size:0.7rem;color:#94a3b8">
+        Clique no veículo para detalhar cobertura
+    </div>
+</div>
+
+<div id="debugInfo"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIGURAÇÃO
+// ═══════════════════════════════════════════════════
+const SHEET_FROTA = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpX2je4AsPF0tcKl67A_FEprw0uugaZ_CvejLFc4SUqXcnyM-63uZj_QC9bqz_LUrX-_OV1kRvsDgu/pub?gid=0&single=true&output=csv';
+const SHEET_ERBS  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRu56ZgpZtvvtSJ6-Ia-MzWOY7BhSC-SowleKQCn8Wrhejh5YqcSMhnoC1Ex8HV44b-vTrL-einOXXD/pub?gid=0&single=true&output=csv';
+
+const PROXIES = [
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+// ═══════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ═══════════════════════════════════════════════════
+let todosVeiculos   = [];
+let marcadores      = [];
+let cardAtivo       = null;
+let erbsPorMunicipio = {}; // normalizado -> { total, tecs: Set, operadoras: {} }
+let geocodeCache    = {};  // "lat,lng" -> nome do municipio
+let erbsCarregadas  = false;
+let debugLog        = [];
+
+// ═══════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════
+const map = L.map('map', { zoomControl: true }).setView([-15.8, -48.0], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 19
+}).addTo(map);
+
+// ═══════════════════════════════════════════════════
+// UTILITÁRIOS
+// ═══════════════════════════════════════════════════
+
+/** Remove acentos, coloca em maiúsculo e trim */
+function normalizar(str) {
+    return (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .trim();
+}
+
+function setStatus(msg, state) {
+    document.getElementById('statusText').textContent = msg;
+    const dot = document.getElementById('dot');
+    dot.className = 'dot ' + (state || '');
+    document.getElementById('retryBtn').style.display = state === 'error' ? 'block' : 'none';
+}
+
+function log(msg) {
+    console.log(msg);
+    debugLog.push(msg);
+}
+
+async function fetchComProxy(sheetUrl) {
+    for (let i = 0; i < PROXIES.length; i++) {
+        try {
+            setStatus(`Carregando (proxy ${i+1}/3)...`, '');
+            const res = await fetch(PROXIES[i](sheetUrl), { cache: 'no-cache' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const text = await res.text();
+            if (text && text.length > 50) {
+                log(`Proxy ${i+1} OK, ${text.length} bytes`);
+                return text;
+            }
+        } catch(e) { log(`Proxy ${i+1} falhou: ${e.message}`); }
+    }
+    return null;
+}
+
+function parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toUpperCase());
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const vals = [];
+        let cur = '', inQ = false;
+        for (const ch of lines[i]) {
+            if (ch === '"') { inQ = !inQ; }
+            else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+            else { cur += ch; }
+        }
+        vals.push(cur.trim());
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = (vals[idx] || '').replace(/^"|"$/g, '').trim(); });
+        rows.push(obj);
+    }
+    return rows;
+}
+
+function parseDateBR(raw) {
+    if (!raw) return null;
+    const partes = raw.trim().split(' ')[0].split('/');
+    if (partes.length === 3) {
+        const d = new Date(+partes[2], +partes[1]-1, +partes[0]);
+        if (!isNaN(d)) return d;
+    }
+    const d = new Date(raw);
+    return isNaN(d) ? null : d;
+}
+
+function corPorDias(dias) {
+    if (dias > 7)  return { cor: '#ef4444', badge: '#ef4444' };
+    if (dias > 2)  return { cor: '#f59e0b', badge: '#f59e0b' };
+    return { cor: '#0ea5e9', badge: '#0ea5e9' };
+}
+
+// ═══════════════════════════════════════════════════
+// GEOCODING REVERSO (Nominatim)
+// ═══════════════════════════════════════════════════
+async function getMunicipioPorCoord(lat, lng) {
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    if (geocodeCache[key] !== undefined) return geocodeCache[key];
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=pt`;
+        const res = await fetch(url, { headers: { 'User-Agent': 'MonitorCalorFrota/1.0' } });
+        const data = await res.json();
+        const mun = data?.address?.city
+                 || data?.address?.town
+                 || data?.address?.village
+                 || data?.address?.municipality
+                 || '';
+        geocodeCache[key] = mun;
+        log(`Geocode [${lat.toFixed(4)},${lng.toFixed(4)}] → "${mun}"`);
+        return mun;
+    } catch(e) {
+        geocodeCache[key] = '';
+        return '';
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// CARREGA ERBs
+// Agrupa: municipio_normalizado → { total, tecs: Set, operadoras: { nome → { tecs: Set, total, classifs: Set } } }
+// ═══════════════════════════════════════════════════
+async function carregarERBs() {
+    log('--- Carregando ERBs ---');
+    const csv = await fetchComProxy(SHEET_ERBS);
+    if (!csv) {
+        log('ERRO: ERBs não carregadas');
+        erbsCarregadas = false;
+        return;
+    }
+
+    const rows = parseCSV(csv);
+    log(`ERBs CSV: ${rows.length} linhas. Colunas: ${Object.keys(rows[0] || {}).join(', ')}`);
+
+    erbsPorMunicipio = {};
+
+    rows.forEach(row => {
+        // Tenta vários nomes possíveis para a coluna de município
+        const munRaw = row['MUN'] || row['MUNICIPIO'] || row['MUNICÍPIO'] || row['CIDADE'] || row['CITY'] || '';
+        const mun = normalizar(munRaw);
+
+        // Tecnologias: pode ser coluna TECS separada por espaço ou vírgula
+        const tecsRaw = row['TECS'] || row['TEC'] || row['TECNOLOGIA'] || row['TECNOLOGIAS'] || '';
+        const tecs = tecsRaw
+            .split(/[\s,;/|]+/)
+            .map(t => t.trim().toUpperCase())
+            .filter(t => t && /^[2345]G$/.test(t)); // aceita somente 2G/3G/4G/5G
+
+        const op      = (row['OPERADORA'] || row['OPERATOR'] || row['EMPRESA'] || '').trim();
+        const classif = (row['CLASSINFRAFISICA'] || row['CLASSINFRA'] || row['CLASS'] || '').trim();
+
+        if (!mun) return; // pula linhas sem município
+
+        if (!erbsPorMunicipio[mun]) {
+            erbsPorMunicipio[mun] = { total: 0, tecs: new Set(), operadoras: {} };
+        }
+        erbsPorMunicipio[mun].total++;
+        tecs.forEach(t => erbsPorMunicipio[mun].tecs.add(t));
+
+        if (op) {
+            if (!erbsPorMunicipio[mun].operadoras[op]) {
+                erbsPorMunicipio[mun].operadoras[op] = { tecs: new Set(), total: 0, classifs: new Set() };
+            }
+            erbsPorMunicipio[mun].operadoras[op].total++;
+            tecs.forEach(t => erbsPorMunicipio[mun].operadoras[op].tecs.add(t));
+            if (classif) erbsPorMunicipio[mun].operadoras[op].classifs.add(classif);
+        }
+    });
+
+    const totalMunicipios = Object.keys(erbsPorMunicipio).length;
+    log(`ERBs processadas: ${totalMunicipios} municípios únicos`);
+    log(`Exemplos: ${Object.keys(erbsPorMunicipio).slice(0, 8).join(', ')}`);
+
+    // Mostra amostra das tecnologias encontradas para debug
+    const amostra = Object.entries(erbsPorMunicipio).slice(0, 3);
+    amostra.forEach(([mun, info]) => {
+        log(`  ${mun}: ${info.total} ERBs | tecs: [${[...info.tecs].join(',')}] | ops: ${Object.keys(info.operadoras).join(', ')}`);
+    });
+
+    erbsCarregadas = totalMunicipios > 0;
+}
+
+// ═══════════════════════════════════════════════════
+// BUSCA INFO DO MUNICÍPIO (com fallback de busca parcial)
+// ═══════════════════════════════════════════════════
+function getInfoMunicipio(municipio) {
+    if (!municipio) return null;
+    const chave = normalizar(municipio);
+
+    // 1. Busca exata
+    if (erbsPorMunicipio[chave]) return erbsPorMunicipio[chave];
+
+    // 2. Busca parcial: nome do município está contido na chave ou vice-versa
+    // Isso resolve "Goiania" vs "Goiania - GO" etc.
+    const chaves = Object.keys(erbsPorMunicipio);
+    for (const k of chaves) {
+        if (k.includes(chave) || chave.includes(k)) {
+            log(`Match parcial: "${chave}" → "${k}"`);
+            return erbsPorMunicipio[k];
+        }
+    }
+
+    log(`Município "${chave}" NÃO encontrado nas ERBs`);
+    return null;
+}
+
+function temCobertura(municipio) {
+    return getInfoMunicipio(municipio) !== null;
+}
+
+// ═══════════════════════════════════════════════════
+// PAINEL DE DETALHE
+// ═══════════════════════════════════════════════════
+function fecharPainel() {
+    document.getElementById('painel').style.display = 'none';
+    if (cardAtivo) { cardAtivo.classList.remove('ativo'); cardAtivo = null; }
+}
+
+async function abrirPainel(v, cardEl) {
+    const painel = document.getElementById('painel');
+    const { cor } = corPorDias(v.dias);
+
+    if (cardAtivo) cardAtivo.classList.remove('ativo');
+    if (cardEl) { cardEl.classList.add('ativo'); cardAtivo = cardEl; }
+
+    document.getElementById('painel-placa').textContent = v.placa;
+    document.getElementById('painel-body').innerHTML = `
+        <div class="painel-row">⏱ Offline há <b style="color:${cor}">&nbsp;${v.dias} dia${v.dias !== 1 ? 's' : ''}</b></div>
+        <div class="painel-secao">📡 Cobertura de Rede</div>
+        <div class="erb-loading">Buscando município…</div>
+    `;
+    painel.style.display = 'block';
+    map.flyTo([v.lat, v.lng], 13, { duration: 1 });
+
+    // Resolve município: usa o da planilha ou faz geocoding
+    let municipio = v.municipio || '';
+    if (!municipio) {
+        municipio = await getMunicipioPorCoord(v.lat, v.lng);
+        v.municipio = municipio;
+        // Atualiza o card na lista
+        const idx = todosVeiculos.indexOf(v);
+        const span = document.querySelector('#card-' + idx + ' .card-info span');
+        if (span && municipio) span.textContent = municipio;
+    }
+
+    const info = getInfoMunicipio(municipio);
+    const corTec = { '5G': '#7c3aed', '4G': '#0ea5e9', '3G': '#10b981', '2G': '#64748b' };
+    let cobHTML = '';
+
+    if (!municipio) {
+        cobHTML = `<div class="badge-cobertura badge-nao">⚠ Município não identificado</div>`;
+
+    } else if (!info) {
+        cobHTML = `
+            <div class="painel-row">📍 <b>${municipio}</b></div>
+            <div class="badge-cobertura badge-nao">✕ Sem ERBs cadastradas neste município</div>
+            ${!erbsCarregadas ? '<div style="font-size:0.7rem;color:#f59e0b;margin-top:4px">⚠ Planilha de ERBs pode não ter carregado corretamente</div>' : ''}
+        `;
+    } else {
+        const tecsGlobal = [...info.tecs].sort();
+        const badgesTec = tecsGlobal.length > 0
+            ? tecsGlobal.map(t => {
+                const c = corTec[t] || '#64748b';
+                return `<span class="erb-tec" style="background:${c}20;color:${c};border:1px solid ${c}55">${t}</span>`;
+              }).join('')
+            : '<span style="font-size:0.72rem;color:#94a3b8">Tecnologia não informada</span>';
+
+        let opRows = '';
+        const ops = Object.entries(info.operadoras).sort();
+        if (ops.length > 0) {
+            ops.forEach(([op, dados]) => {
+                const tecOp = [...dados.tecs].sort().map(t => {
+                    const c = corTec[t] || '#64748b';
+                    return `<span style="font-size:0.65rem;font-weight:700;color:${c};background:${c}18;border-radius:4px;padding:1px 5px;margin-right:2px">${t}</span>`;
+                }).join('');
+                const classifStr = dados.classifs.size
+                    ? `<span style="font-size:0.62rem;color:#94a3b8">(${[...dados.classifs].join(', ')})</span>`
+                    : '';
+                opRows += `<div class="erb-operadora">
+                    <span style="font-weight:600;color:#0f172a;font-size:0.72rem">${op}</span>
+                    <span>${tecOp} ${classifStr}</span>
+                    <span style="font-size:0.62rem;color:#94a3b8">${dados.total} ERB${dados.total !== 1 ? 's' : ''}</span>
+                </div>`;
+            });
+        } else {
+            opRows = `<div style="font-size:0.72rem;color:#94a3b8">Operadoras não informadas</div>`;
+        }
+
+        cobHTML = `
+            <div class="painel-row">📍 <b>${municipio}</b> &mdash; <span style="color:#64748b">${info.total} ERB${info.total !== 1 ? 's' : ''} no total</span></div>
+            <div class="badge-cobertura badge-sim">✓ Cobertura confirmada</div>
+            <div style="margin:4px 0 8px"><span class="erb-grid">${badgesTec}</span></div>
+            <div class="painel-secao">Por Operadora</div>
+            <div>${opRows}</div>
+        `;
+    }
+
+    document.getElementById('painel-body').innerHTML = `
+        <div class="painel-row">⏱ Offline há <b style="color:${cor}">&nbsp;${v.dias} dia${v.dias !== 1 ? 's' : ''}</b></div>
+        <div class="painel-row">🗺 ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}</div>
+        <div class="painel-secao">📡 Cobertura de Rede</div>
+        ${cobHTML}
+    `;
+}
+
+// ═══════════════════════════════════════════════════
+// LISTA LATERAL
+// ═══════════════════════════════════════════════════
+function renderLista(veiculos) {
+    const el = document.getElementById('unit-list');
+    if (!veiculos.length) {
+        el.innerHTML = '<div style="padding:30px;text-align:center;color:#94a3b8;font-size:0.8rem">Nenhum veículo encontrado.</div>';
+        return;
+    }
+    el.innerHTML = veiculos.map(v => {
+        const { cor, badge } = corPorDias(v.dias);
+        const idx = todosVeiculos.indexOf(v);
+        const cob = temCobertura(v.municipio);
+        const cobIcon = v.municipio
+            ? (cob ? '<span title="Com cobertura" style="color:#22c55e">●</span>' : '<span title="Sem cobertura" style="color:#9ca3af">○</span>')
+            : '';
+        return `<div class="card" id="card-${idx}" onclick="clicarCard(${idx})">
+            <div class="card-dot" style="background:${cor};box-shadow:0 0 6px ${cor}88"></div>
+            <div class="card-info">
+                <b>${v.placa}</b>
+                <span>${v.municipio || 'Clique para ver localização'}</span>
+            </div>
+            <span class="card-cobertura">${cobIcon}</span>
+            <div class="card-dias" style="background:${badge}22;color:${badge}">${v.dias}d</div>
+        </div>`;
+    }).join('');
+}
+
+function filtrarLista(q) {
+    const qu = q.toUpperCase();
+    renderLista(todosVeiculos.filter(v =>
+        v.placa.toUpperCase().includes(qu) || (v.municipio || '').toUpperCase().includes(qu)
+    ));
+}
+
+function clicarCard(idx) {
+    const v = todosVeiculos[idx];
+    if (!v) return;
+    abrirPainel(v, document.getElementById('card-' + idx));
+}
+
+// ═══════════════════════════════════════════════════
+// MAPA – marcadores coloridos + anel de cobertura
+// ═══════════════════════════════════════════════════
+function limparMarcadores() {
+    marcadores.forEach(m => map.removeLayer(m));
+    marcadores = [];
+}
+
+function renderMapa(veiculos) {
+    limparMarcadores();
+    veiculos.forEach(v => {
+        const { cor } = corPorDias(v.dias);
+        const raio = v.dias > 7 ? 14000 : v.dias > 2 ? 9000 : 5500;
+        const idx  = todosVeiculos.indexOf(v);
+
+        // Anel externo (halo)
+        const halo = L.circle([v.lat, v.lng], {
+            radius: raio * 1.7, color: 'transparent', fillColor: cor, fillOpacity: 0.06
+        }).addTo(map);
+
+        // Círculo principal colorido por dias offline
+        const circ = L.circle([v.lat, v.lng], {
+            radius: raio, color: cor, weight: 1.5, opacity: 0.75, fillColor: cor, fillOpacity: 0.22
+        }).addTo(map);
+
+        // Indicador de cobertura: anel interno verde ou cinza
+        const corCob = temCobertura(v.municipio) ? '#22c55e' : '#9ca3af';
+        const marcadorCentro = L.circleMarker([v.lat, v.lng], {
+            radius: 6,
+            color: corCob,
+            weight: 2,
+            fillColor: corCob,
+            fillOpacity: 0.9
+        }).addTo(map);
+
+        // Popup informativo
+        const popupHTML = `
+            <div style="min-width:160px">
+                <div style="font-size:1rem;font-weight:800;color:#0f172a">${v.placa}</div>
+                <div style="font-size:0.78rem;color:#475569;margin-top:4px">Offline: <b style="color:${cor}">${v.dias}d</b></div>
+                ${v.municipio ? `<div style="font-size:0.75rem;color:#475569;margin-top:2px">📍 ${v.municipio}</div>` : ''}
+                <div style="font-size:0.75rem;margin-top:4px">
+                    ${temCobertura(v.municipio)
+                        ? `<span style="color:#16a34a;font-weight:700">✓ Com cobertura</span>`
+                        : `<span style="color:#dc2626;font-weight:700">✕ Sem cobertura cadastrada</span>`
+                    }
+                </div>
+                <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">Clique para detalhes completos</div>
+            </div>
+        `;
+        marcadorCentro.bindPopup(popupHTML);
+
+        // Clique no círculo ou marcador → abre painel lateral
+        const onClickVeiculo = () => abrirPainel(v, document.getElementById('card-' + idx));
+        circ.on('click', onClickVeiculo);
+        marcadorCentro.on('click', onClickVeiculo);
+
+        marcadores.push(halo, circ, marcadorCentro);
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// CARREGAMENTO PRINCIPAL
+// ═══════════════════════════════════════════════════
+async function carregar() {
+    debugLog = [];
+    log('=== Início do carregamento ===');
+
+    // 1. Carrega ERBs primeiro
+    setStatus('Carregando ERBs...', '');
+    await carregarERBs();
+
+    // 2. Carrega frota
+    setStatus('Carregando frota...', '');
+    const csv = await fetchComProxy(SHEET_FROTA);
+    if (!csv || csv.length < 50) {
+        setStatus('Falha ao carregar. Verifique a planilha.', 'error');
+        return;
+    }
+
+    const rows = parseCSV(csv);
+    log(`Frota CSV: ${rows.length} linhas. Colunas: ${Object.keys(rows[0] || {}).join(', ')}`);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    todosVeiculos = rows.reduce((acc, item) => {
+        const lat   = parseFloat((item['LAT']  || '').replace(',', '.'));
+        const lng   = parseFloat((item['LONG'] || item['LNG'] || item['LON'] || '').replace(',', '.'));
+        const placa = item['PLACA'] || '';
+        if (isNaN(lat) || isNaN(lng) || !placa) return acc;
+
+        const dataFim = parseDateBR(item['PAROU DE COMUNICAR'] || item['DATA'] || '');
+        const dias    = dataFim ? Math.max(0, Math.floor((today - dataFim) / 86400000)) : 0;
+
+        // Município: tenta múltiplas colunas
+        const municipio = (
+            item['MUNICIPIO'] || item['MUNICÍPIO'] || item['MUN'] ||
+            item['CIDADE'] || item['CITY'] || ''
+        ).trim();
+
+        acc.push({ lat, lng, placa, dias, municipio });
+        return acc;
+    }, []).sort((a, b) => b.dias - a.dias);
+
+    // Estatísticas
+    const critico = todosVeiculos.filter(v => v.dias > 7).length;
+    const medio   = todosVeiculos.filter(v => v.dias > 2 && v.dias <= 7).length;
+    document.getElementById('sTotal').textContent   = todosVeiculos.length;
+    document.getElementById('sMedio').textContent   = medio;
+    document.getElementById('sCritico').textContent = critico;
+
+    // Verifica quantos veículos têm município informado e com cobertura
+    const comMunicipio = todosVeiculos.filter(v => v.municipio).length;
+    const comCobertura = todosVeiculos.filter(v => temCobertura(v.municipio)).length;
+    log(`Veículos com município: ${comMunicipio}/${todosVeiculos.length}`);
+    log(`Veículos com cobertura: ${comCobertura}/${todosVeiculos.length}`);
+
+    renderLista(todosVeiculos);
+    renderMapa(todosVeiculos);
+
+    if (todosVeiculos.length > 0) {
+        map.fitBounds(
+            L.latLngBounds(todosVeiculos.map(v => [v.lat, v.lng])),
+            { padding: [40, 40] }
+        );
+    }
+
+    const totalMunic = Object.keys(erbsPorMunicipio).length;
+    const statusMsg = `${todosVeiculos.length} veículos · ${totalMunic} municípios com ERBs · ${comCobertura} com cobertura`;
+    setStatus(statusMsg, 'ok');
+    log(`=== Carregamento concluído: ${statusMsg} ===`);
+
+    // Se NENHUM veículo tem cobertura mas ERBs carregaram, mostra aviso de debug
+    if (erbsCarregadas && comCobertura === 0 && comMunicipio > 0) {
+        log('⚠ ATENÇÃO: ERBs carregadas mas nenhum match encontrado!');
+        log('Exemplos de municípios na frota: ' + todosVeiculos.slice(0,5).map(v => `"${normalizar(v.municipio)}"`).join(', '));
+        log('Exemplos de chaves ERBs: ' + Object.keys(erbsPorMunicipio).slice(0,5).join(', '));
+
+        // Mostra painel de debug no mapa
+        const dbg = document.getElementById('debugInfo');
+        dbg.style.display = 'block';
+        dbg.innerHTML = `<b style="color:#f59e0b">⚠ Debug: 0 matches de município</b><br>
+            Frota: ${todosVeiculos.slice(0,3).map(v => normalizar(v.municipio)).join(' | ')}<br>
+            ERBs: ${Object.keys(erbsPorMunicipio).slice(0,3).join(' | ')}<br>
+            <small>Verifique se os nomes batem</small>`;
+    }
+}
+
+carregar();
+setInterval(carregar, 60000);
+</script>
+</body>
+</html>
