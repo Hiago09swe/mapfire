@@ -5,616 +5,311 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Monitor de Calor — Frota Offline</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet via cdnjs (mais confiável) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- MarkerCluster -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<!-- Heat -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<!-- PapaParse -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Manrope:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
 
 <style>
-:root {
-  --bg: #06090f;
-  --surface: #0d1117;
-  --panel: #111820;
-  --border: #1c2635;
-  --border2: #243040;
-  --accent: #e85d04;
-  --accent2: #faa307;
-  --blue: #3b82f6;
-  --green: #10b981;
-  --red: #ef4444;
-  --yellow: #f59e0b;
-  --purple: #8b5cf6;
-  --text: #d1d5db;
-  --text2: #9ca3af;
-  --muted: #4b5563;
-  --mono: 'Space Mono', monospace;
-  --sans: 'Manrope', sans-serif;
-  --r: 8px;
+:root{
+  --bg:#06090f;--surface:#0d1117;--panel:#111820;--border:#1c2635;
+  --border2:#243040;--accent:#e85d04;--accent2:#faa307;--blue:#3b82f6;
+  --green:#10b981;--red:#ef4444;--yellow:#f59e0b;--purple:#8b5cf6;
+  --text:#d1d5db;--text2:#9ca3af;--muted:#4b5563;
+  --mono:'Space Mono',monospace;--sans:'Manrope',sans-serif;--r:8px;
 }
-
 *{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
-body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:var(--sans);
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-
-/* ── HEADER ── */
-header{
-  height:48px;
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  padding:0 16px;
-  gap:20px;
-  flex-shrink:0;
-  z-index:1100;
-}
-
-.logo{
-  font-family:var(--mono);
-  font-size:13px;
-  font-weight:700;
-  letter-spacing:2px;
-  color:var(--accent);
-  text-transform:uppercase;
-  white-space:nowrap;
-}
+header{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:1100}
+.logo{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:2px;color:var(--accent);white-space:nowrap}
 .logo em{color:var(--text2);font-style:normal}
-
-.header-pills{
-  display:flex;
-  gap:6px;
-  margin-left:auto;
-  align-items:center;
-}
-
-.pill{
-  display:flex;
-  align-items:center;
-  gap:5px;
-  padding:4px 10px;
-  border-radius:20px;
-  border:1px solid var(--border2);
-  background:var(--panel);
-  font-size:11px;
-  color:var(--text2);
-  font-family:var(--mono);
-  white-space:nowrap;
-}
-.pill strong{color:var(--text);font-size:13px}
+.hpills{display:flex;gap:5px;margin-left:auto;align-items:center;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--panel);font-size:10px;color:var(--text2);font-family:var(--mono);white-space:nowrap}
+.pill strong{color:var(--text);font-size:12px}
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 
-/* ── IMPORT BAR ── */
-#import-bar{
-  background:var(--surface);
-  border-bottom:1px solid var(--accent);
-  padding:6px 14px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-shrink:0;
-  flex-wrap:wrap;
-}
+/* Input bars */
+.ibar{background:var(--surface);border-bottom:1px solid var(--border2);padding:5px 12px;display:flex;align-items:center;gap:7px;flex-shrink:0;flex-wrap:wrap}
+.ibar .lbl{font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.ibar .sep{width:1px;height:20px;background:var(--border2);margin:0 4px}
+.cinput{flex:1;min-width:200px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.3);border-radius:var(--r);color:var(--text);padding:4px 9px;font-size:10px;font-family:var(--mono);outline:none}
+.cinput:focus{border-color:var(--accent)}
+.cinput::placeholder{color:var(--muted)}
+.btn{padding:4px 11px;border-radius:var(--r);font-size:10px;font-weight:700;font-family:var(--mono);cursor:pointer;border:none;transition:opacity .2s;white-space:nowrap}
+.btn:hover{opacity:.8}
+.btn-a{background:var(--accent);color:#fff}
+.btn-b{background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.4);color:var(--blue)}
+.btn-g{background:var(--panel);border:1px solid var(--border2);color:var(--text2)}
+input[type=file]{display:none}
+#st{font-size:9px;font-family:var(--mono);color:var(--green);white-space:nowrap}
 
-#import-bar label.lbl{
-  font-family:var(--mono);
-  font-size:10px;
-  color:var(--accent);
-  letter-spacing:1px;
-  text-transform:uppercase;
-  white-space:nowrap;
-}
+/* Progress bar */
+#erb-progress{height:3px;background:var(--border);flex-shrink:0}
+#erb-progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .1s;box-shadow:0 0 6px var(--accent)}
 
-#csv-url{
-  flex:1;
-  min-width:260px;
-  background:rgba(232,93,4,.07);
-  border:1px solid rgba(232,93,4,.4);
-  border-radius:var(--r);
-  color:var(--text);
-  padding:5px 10px;
-  font-size:11px;
-  font-family:var(--mono);
-  outline:none;
-}
-#csv-url::placeholder{color:var(--muted)}
-#csv-url:focus{border-color:var(--accent)}
+.layout{display:flex;flex:1;overflow:hidden}
 
-.btn{
-  padding:5px 12px;
-  border-radius:var(--r);
-  font-size:11px;
-  font-weight:700;
-  font-family:var(--mono);
-  cursor:pointer;
-  border:none;
-  transition:opacity .2s;
-  letter-spacing:.5px;
-  white-space:nowrap;
-}
-.btn:hover{opacity:.82}
-.btn-accent{background:var(--accent);color:#fff}
-.btn-ghost{background:var(--panel);border:1px solid var(--border2);color:var(--text2)}
-#csv-file{display:none}
-#import-status{font-size:10px;font-family:var(--mono);color:var(--green)}
-
-/* ── LAYOUT ── */
-.layout{
-  display:flex;
-  flex:1;
-  overflow:hidden;
-}
-
-/* ── SIDEBAR ── */
-.sidebar{
-  width:300px;
-  flex-shrink:0;
-  background:var(--surface);
-  border-right:1px solid var(--border);
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-
-.sb-tabs{
-  display:flex;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-}
-.sb-tab{
-  flex:1;
-  padding:9px 2px;
-  text-align:center;
-  font-size:9px;
-  font-family:var(--mono);
-  letter-spacing:1px;
-  text-transform:uppercase;
-  color:var(--muted);
-  cursor:pointer;
-  border-bottom:2px solid transparent;
-  transition:all .2s;
-}
-.sb-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-
+.sidebar{width:280px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sbtabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.sbtab{flex:1;padding:8px 2px;text-align:center;font-size:9px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.sbtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-pane{display:none;flex:1;overflow:hidden;flex-direction:column}
 .tab-pane.active{display:flex}
 
-/* Filters */
-.filters{
-  padding:12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  overflow-y:auto;
-  flex:1;
-}
+.filters{padding:10px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;flex:1}
 .filters::-webkit-scrollbar{width:3px}
 .filters::-webkit-scrollbar-thumb{background:var(--border2)}
-
-.flabel{
-  font-size:9px;
-  font-family:var(--mono);
-  letter-spacing:1.2px;
-  text-transform:uppercase;
-  color:var(--muted);
-  margin-bottom:5px;
-}
-
-.finput{
-  width:100%;
-  background:var(--panel);
-  border:1px solid var(--border2);
-  border-radius:var(--r);
-  color:var(--text);
-  padding:6px 10px;
-  font-size:11px;
-  font-family:var(--sans);
-  outline:none;
-  transition:border-color .2s;
-}
+.flabel{font-size:9px;font-family:var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.finput{width:100%;background:var(--panel);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);padding:5px 9px;font-size:11px;font-family:var(--sans);outline:none;transition:border-color .2s}
 .finput:focus{border-color:var(--accent)}
 .finput::placeholder{color:var(--muted)}
 
-/* Chip filters */
-.chip-group{display:flex;flex-wrap:wrap;gap:4px}
-.chip{
-  padding:3px 9px;
-  border-radius:20px;
-  border:1px solid var(--border2);
-  background:var(--panel);
-  color:var(--text2);
-  font-size:10px;
-  font-family:var(--mono);
-  cursor:pointer;
-  transition:all .18s;
-  letter-spacing:.4px;
-}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{padding:3px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--panel);color:var(--text2);font-size:9px;font-family:var(--mono);cursor:pointer;transition:all .18s;user-select:none}
 .chip:hover{border-color:var(--accent2);color:var(--accent2)}
-.chip.active{background:rgba(232,93,4,.15);border-color:var(--accent);color:var(--accent)}
-.chip.tec-chip.active{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue)}
+.chip.on{background:rgba(232,93,4,.15);border-color:var(--accent);color:var(--accent)}
+.chip.tec.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue)}
 
-/* Slider */
-.slider-row{display:flex;align-items:center;gap:8px}
-input[type=range]{
-  -webkit-appearance:none;appearance:none;
-  flex:1;height:3px;background:var(--border2);border-radius:3px;outline:none;
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:14px;height:14px;
-  border-radius:50%;background:var(--accent);cursor:pointer;
-  box-shadow:0 0 6px rgba(232,93,4,.5);
-}
-.range-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);width:52px;text-align:right;white-space:nowrap}
+.srow{display:flex;align-items:center;gap:8px}
+input[type=range]{-webkit-appearance:none;flex:1;height:3px;background:var(--border2);border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer}
+.rval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);width:48px;text-align:right;white-space:nowrap}
 
-/* View mode */
-.view-btns{display:flex;gap:4px}
-.vbtn{
-  flex:1;padding:5px;border-radius:6px;
-  border:1px solid var(--border2);background:var(--panel);
-  color:var(--muted);font-size:9px;font-family:var(--mono);
-  letter-spacing:.8px;text-transform:uppercase;cursor:pointer;
-  transition:all .18s;text-align:center;
-}
+.vbtns{display:flex;gap:4px}
+.vbtn{flex:1;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);color:var(--muted);font-size:9px;font-family:var(--mono);text-transform:uppercase;cursor:pointer;transition:all .18s;text-align:center}
 .vbtn.active{background:rgba(232,93,4,.12);border-color:var(--accent);color:var(--accent)}
 
-/* Bottom counter */
-.sb-footer{
-  padding:10px 12px;
-  border-top:1px solid var(--border);
-  flex-shrink:0;
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-.counter-big{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--accent)}
-.counter-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.sbfoot{padding:9px 10px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:12px}
+.cbig{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent)}
+.clbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
 
-/* List */
-.list-header{
-  padding:8px 12px 6px;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-}
-.list-header .sub{font-size:10px;font-family:var(--mono);color:var(--accent);margin-top:2px}
-
-.vlist{flex:1;overflow-y:auto;padding:6px}
+.lhdr{padding:8px 10px 6px;border-bottom:1px solid var(--border);flex-shrink:0}
+.lsub{font-size:9px;font-family:var(--mono);color:var(--accent);margin-top:2px}
+.vlist{flex:1;overflow-y:auto;padding:5px}
 .vlist::-webkit-scrollbar{width:3px}
 .vlist::-webkit-scrollbar-thumb{background:var(--border2)}
 
-.vcard{
-  background:var(--panel);
-  border:1px solid var(--border2);
-  border-radius:var(--r);
-  padding:9px 11px;
-  margin-bottom:5px;
-  cursor:pointer;
-  transition:all .18s;
-  position:relative;
-}
-.vcard:hover{border-color:var(--accent);box-shadow:0 0 8px rgba(232,93,4,.1)}
+.vcard{background:var(--panel);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;margin-bottom:4px;cursor:pointer;transition:all .18s;position:relative}
+.vcard:hover{border-color:var(--accent)}
 .vcard.sel{border-color:var(--accent);background:rgba(232,93,4,.06)}
+.vcard-placa{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);margin-bottom:2px}
+.vcard-meta{font-size:9px;color:var(--text2);display:flex;gap:5px;flex-wrap:wrap}
+.bdias{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+.bdias.crit{background:rgba(239,68,68,.18);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.bdias.med{background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+.bdias.rec{background:rgba(59,130,246,.18);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
 
-.vcard-placa{
-  font-family:var(--mono);
-  font-size:12px;
-  font-weight:700;
-  color:var(--text);
-  margin-bottom:2px;
-}
-.vcard-meta{font-size:10px;color:var(--text2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.abody{flex:1;overflow-y:auto;padding:10px}
+.abody::-webkit-scrollbar{width:3px}
+.abody::-webkit-scrollbar-thumb{background:var(--border2)}
+.mcard{background:var(--panel);border:1px solid var(--border2);border-radius:var(--r);padding:10px;margin-bottom:7px}
+.mtitle{font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.mval{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent)}
+.msub{font-size:10px;color:var(--muted);margin-top:2px}
+.bitem{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.blbl{font-size:9px;color:var(--text);width:64px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+.bout{flex:1;height:9px;background:var(--border);border-radius:4px;overflow:hidden}
+.bin{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s}
+.bn{font-size:9px;color:var(--accent);font-family:var(--mono);width:26px;text-align:right;flex-shrink:0}
 
-.badge-dias{
-  position:absolute;top:9px;right:9px;
-  font-family:var(--mono);font-size:11px;font-weight:700;
-  padding:2px 7px;border-radius:4px;
-}
-.badge-dias.crit{background:rgba(239,68,68,.18);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
-.badge-dias.med{background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
-.badge-dias.rec{background:rgba(59,130,246,.18);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
+.exprow{display:flex;gap:5px;padding:7px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.bexp{flex:1;padding:5px;border-radius:var(--r);border:1px solid var(--accent2);background:rgba(250,163,7,.07);color:var(--accent2);font-size:9px;font-family:var(--mono);text-transform:uppercase;cursor:pointer;transition:all .18s}
+.bexp:hover{background:rgba(250,163,7,.15)}
 
-/* Analytics */
-.analytics-body{flex:1;overflow-y:auto;padding:12px}
-.analytics-body::-webkit-scrollbar{width:3px}
-.analytics-body::-webkit-scrollbar-thumb{background:var(--border2)}
-
-.mcard{
-  background:var(--panel);
-  border:1px solid var(--border2);
-  border-radius:var(--r);
-  padding:11px;
-  margin-bottom:8px;
-}
-.mtitle{font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:7px}
-.mval{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent)}
-.msub{font-size:10px;color:var(--muted);margin-top:3px}
-
-.bar-item{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.bar-lbl{font-size:10px;color:var(--text);width:70px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
-.bar-out{flex:1;height:10px;background:var(--border);border-radius:4px;overflow:hidden}
-.bar-in{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease}
-.bar-n{font-size:10px;color:var(--accent);font-family:var(--mono);width:24px;text-align:right;flex-shrink:0}
-
-.export-row{
-  display:flex;gap:6px;padding:8px 12px;
-  border-top:1px solid var(--border);flex-shrink:0;
-}
-.btn-exp{
-  flex:1;padding:6px;border-radius:var(--r);
-  border:1px solid var(--accent2);background:rgba(250,163,7,.07);
-  color:var(--accent2);font-size:10px;font-family:var(--mono);
-  letter-spacing:.5px;text-transform:uppercase;cursor:pointer;
-  transition:all .18s;
-}
-.btn-exp:hover{background:rgba(250,163,7,.15)}
-
-/* ── MAP AREA ── */
 .map-area{position:relative;flex:1;display:flex}
 #map{flex:1;z-index:1}
 
-/* Legend */
-.legend{
-  position:absolute;bottom:28px;right:10px;
-  background:rgba(13,17,23,.92);
-  border:1px solid var(--border2);
-  border-radius:var(--r);
-  padding:8px 12px;
-  z-index:500;
-  font-size:10px;
-  color:var(--text2);
-  pointer-events:none;
-  font-family:var(--mono);
-  letter-spacing:.5px;
-}
-.leg-title{color:var(--text);font-weight:700;margin-bottom:6px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase}
-.leg-item{display:flex;align-items:center;gap:6px;margin-bottom:4px}
-.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.leg-sep{border-top:1px solid var(--border);margin:5px 0}
+.legend{position:absolute;bottom:28px;right:10px;background:rgba(13,17,23,.95);border:1px solid var(--border2);border-radius:var(--r);padding:8px 11px;z-index:500;font-size:9px;color:var(--text2);pointer-events:none;font-family:var(--mono)}
+.leg-t{color:var(--text);font-weight:700;margin-bottom:5px;font-size:9px;letter-spacing:1.2px;text-transform:uppercase}
+.legi{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.legdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.legsep{border-top:1px solid var(--border);margin:4px 0}
 
-/* ERB info bar */
-.erb-bar{
-  position:absolute;top:10px;right:10px;
-  background:rgba(13,17,23,.92);
-  border:1px solid var(--border2);
-  border-radius:var(--r);
-  padding:8px 12px;
-  z-index:500;
-  font-family:var(--mono);
-  font-size:10px;
-  color:var(--text2);
-  max-width:200px;
-  letter-spacing:.4px;
-}
-.erb-bar .etitle{color:var(--blue);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:5px}
-
-/* Popup */
-.leaflet-popup-content-wrapper{
-  background:var(--surface) !important;
-  color:var(--text) !important;
-  border:1px solid var(--border2) !important;
-  border-radius:12px !important;
-  box-shadow:0 8px 32px rgba(0,0,0,.6) !important;
-  padding:0 !important;
-}
-.leaflet-popup-content{margin:0 !important;min-width:260px;max-width:300px}
-.leaflet-popup-tip{background:var(--surface) !important}
-.leaflet-popup-close-button{color:var(--muted) !important;font-size:16px !important;top:8px !important;right:10px !important}
-
-.popup-inner{padding:14px}
-.popup-placa{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:1px}
-.popup-badge{display:inline-block;padding:2px 9px;border-radius:4px;font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:8px}
-.popup-row{font-size:11px;color:var(--text2);margin-bottom:3px;display:flex;gap:5px;align-items:flex-start}
-.popup-coord{background:var(--panel);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;font-family:var(--mono);font-size:10px;color:var(--accent);margin:5px 0}
-.popup-div{border-top:1px solid var(--border);margin:8px 0}
-.popup-sec{font-size:9px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
-.popup-erbs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px}
-.erb-chip{padding:2px 7px;border-radius:3px;font-size:9px;font-family:var(--mono);font-weight:700}
-.erb-chip.ok{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#10b981}
-.erb-chip.no{background:rgba(100,116,139,.1);border:1px solid var(--border2);color:var(--muted)}
-.popup-ops{display:flex;flex-direction:column;gap:3px}
-.op-row{font-size:10px;display:flex;justify-content:space-between;align-items:center}
-.op-name{color:var(--text2)}
-.op-tecs{display:flex;gap:2px}
-.tec-tag{padding:1px 5px;border-radius:3px;font-size:8px;font-family:var(--mono);font-weight:700}
-.tec-2g{background:rgba(59,130,246,.15);color:#93c5fd}
-.tec-3g{background:rgba(16,185,129,.15);color:#6ee7b7}
-.tec-4g{background:rgba(250,163,7,.15);color:#fcd34d}
-.tec-5g{background:rgba(139,92,246,.15);color:#c4b5fd}
-
-/* Loading */
-#overlay{
-  position:fixed;inset:0;background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:9999;transition:opacity .5s;
-}
-#overlay.hide{opacity:0;pointer-events:none}
-.ring{
-  width:44px;height:44px;
-  border:2px solid var(--border2);
-  border-top-color:var(--accent);
-  border-radius:50%;
-  animation:spin .7s linear infinite;
-  margin-bottom:12px;
-}
-@keyframes spin{to{transform:rotate(360deg)}}
-.ring-text{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
-
-/* Toast */
-#toast{
-  position:fixed;bottom:20px;left:50%;
-  transform:translateX(-50%) translateY(70px);
-  background:var(--panel);border:1px solid var(--accent);
-  border-radius:30px;padding:7px 18px;
-  font-size:11px;font-family:var(--mono);color:var(--accent);
-  z-index:99999;transition:transform .3s;white-space:nowrap;
-  box-shadow:0 4px 20px rgba(232,93,4,.2);
-}
-#toast.show{transform:translateX(-50%) translateY(0)}
-
-/* ERB toggle */
-.erb-toggle{
-  position:absolute;top:10px;left:10px;z-index:600;
-  display:flex;gap:4px;
-  background:rgba(13,17,23,.92);
-  border:1px solid var(--border2);
-  border-radius:var(--r);
-  padding:5px;
-}
-.erbtn{
-  padding:4px 10px;border-radius:5px;
-  border:1px solid transparent;
-  background:transparent;color:var(--muted);
-  font-size:9px;font-family:var(--mono);
-  letter-spacing:.8px;text-transform:uppercase;
-  cursor:pointer;transition:all .18s;
-}
+.erbtog{position:absolute;top:10px;left:10px;display:flex;gap:4px;background:rgba(13,17,23,.94);border:1px solid var(--border2);border-radius:var(--r);padding:5px;z-index:600}
+.erbtn{padding:4px 9px;border-radius:5px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:9px;font-family:var(--mono);text-transform:uppercase;cursor:pointer;transition:all .18s}
 .erbtn.active{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue)}
 
-@media(max-width:768px){
-  .sidebar{width:260px}
-  .header-pills{display:none}
-}
+.erbinfo{position:absolute;top:10px;right:10px;background:rgba(13,17,23,.94);border:1px solid var(--border2);border-radius:var(--r);padding:8px 11px;z-index:500;font-family:var(--mono);font-size:9px;color:var(--text2);max-width:200px}
+.erbinfo .et{color:var(--blue);font-size:8px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;font-weight:700}
+
+/* Overlay */
+#ov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .5s}
+#ov.hide{opacity:0;pointer-events:none}
+.ring{width:40px;height:40px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ring-t{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+#ov-msg{font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:6px;letter-spacing:1px}
+#ov-pct{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent);margin-top:8px}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--panel);border:1px solid var(--accent);border-radius:30px;padding:6px 16px;font-size:10px;font-family:var(--mono);color:var(--accent);z-index:99999;transition:transform .3s;white-space:nowrap;box-shadow:0 4px 20px rgba(232,93,4,.2)}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* Popup */
+.leaflet-popup-content-wrapper{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border2)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.6)!important;padding:0!important}
+.leaflet-popup-content{margin:0!important;min-width:240px;max-width:280px}
+.leaflet-popup-tip{background:var(--surface)!important}
+.leaflet-popup-close-button{color:var(--muted)!important;font-size:15px!important;top:7px!important;right:9px!important}
+.pi{padding:12px}
+.pp{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.pbadge{display:inline-block;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700;margin-bottom:7px}
+.prow{font-size:10px;color:var(--text2);margin-bottom:2px}
+.pcoord{background:var(--panel);border:1px solid var(--border2);border-radius:4px;padding:3px 7px;font-family:var(--mono);font-size:9px;color:var(--accent);margin:4px 0}
+.pdiv{border-top:1px solid var(--border);margin:7px 0}
+.psec{font-size:8px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.perbs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px}
+.ec{padding:2px 6px;border-radius:3px;font-size:9px;font-family:var(--mono);font-weight:700}
+.ec.ok{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#10b981}
+.ec.no{background:rgba(100,116,139,.1);border:1px solid var(--border2);color:var(--muted)}
+.ops{display:flex;flex-direction:column;gap:2px}
+.oprow{font-size:9px;display:flex;justify-content:space-between}
+.opname{color:var(--text2)}
+.optecs{display:flex;gap:2px}
+.tt{padding:1px 4px;border-radius:3px;font-size:7px;font-family:var(--mono);font-weight:700}
+.t2g{background:rgba(59,130,246,.15);color:#93c5fd}
+.t3g{background:rgba(16,185,129,.15);color:#6ee7b7}
+.t4g{background:rgba(250,163,7,.15);color:#fcd34d}
+.t5g{background:rgba(139,92,246,.15);color:#c4b5fd}
 </style>
 </head>
 <body>
 
-<div id="overlay">
+<div id="ov">
   <div class="ring"></div>
-  <div class="ring-text">Inicializando</div>
+  <div class="ring-t">Inicializando</div>
+  <div id="ov-msg">Carregando mapa…</div>
+  <div id="ov-pct"></div>
 </div>
-
 <div id="toast"></div>
 
 <header>
-  <div class="logo">🔥 Monitor <em>de</em> Calor — <em>Frota Offline</em></div>
-  <div class="header-pills">
+  <div class="logo">🔥 Monitor <em>de</em> Calor</div>
+  <div class="hpills">
     <div class="pill"><span class="dot" style="background:var(--accent)"></span><strong id="h-total">0</strong>&nbsp;veículos</div>
-    <div class="pill"><span class="dot" style="background:var(--yellow)"></span><strong id="h-med">0</strong>&nbsp;2–7 dias</div>
-    <div class="pill"><span class="dot" style="background:var(--red)"></span><strong id="h-crit">0</strong>&nbsp;&gt;7 dias</div>
+    <div class="pill"><span class="dot" style="background:var(--yellow)"></span><strong id="h-med">0</strong>&nbsp;2–7d</div>
+    <div class="pill"><span class="dot" style="background:var(--red)"></span><strong id="h-crit">0</strong>&nbsp;&gt;7d</div>
     <div class="pill"><span class="dot" style="background:var(--blue)"></span><strong id="h-erbs">0</strong>&nbsp;ERBs</div>
+    <div class="pill"><span class="dot" style="background:var(--green)"></span><strong id="h-mun">—</strong>&nbsp;municípios</div>
   </div>
 </header>
 
-<div id="import-bar">
-  <label class="lbl">📡 Frota (CSV):</label>
-  <input id="csv-url" type="text" placeholder="URL do Google Sheets publicado como CSV ou deixe vazio para demo…"/>
-  <button class="btn btn-accent" onclick="loadURL()">↓ Carregar</button>
-  <label class="btn btn-ghost" for="csv-file">📂 Upload</label>
-  <input id="csv-file" type="file" accept=".csv" onchange="loadFile(event)"/>
-  <span id="import-status"></span>
+<!-- Barra de progresso -->
+<div id="erb-progress"><div id="erb-progress-bar"></div></div>
+
+<!-- Frota -->
+<div class="ibar">
+  <span class="lbl">🚗 Frota CSV:</span>
+  <input class="cinput" id="csv-url" placeholder="URL pública Google Sheets (pub?output=csv)…"/>
+  <button class="btn btn-a" onclick="loadURL()">↓ URL</button>
+  <label class="btn btn-g" for="csv-file">📂 Arquivo</label>
+  <input id="csv-file" type="file" accept=".csv" onchange="loadFile(event,'frota')"/>
+  <div class="sep"></div>
+  <span class="lbl">📡 ERBs CSV:</span>
+  <label class="btn btn-b" for="erb-file">📂 Carregar ERBs</label>
+  <input id="erb-file" type="file" accept=".csv" onchange="loadFile(event,'erbs')"/>
+  <span id="st"></span>
 </div>
 
 <div class="layout">
   <div class="sidebar">
-    <div class="sb-tabs">
-      <div class="sb-tab active" onclick="tab('filters')">Filtros</div>
-      <div class="sb-tab" onclick="tab('list')">Lista</div>
-      <div class="sb-tab" onclick="tab('analytics')">Stats</div>
+    <div class="sbtabs">
+      <div class="sbtab active" onclick="goTab('filters')">Filtros</div>
+      <div class="sbtab" onclick="goTab('list')">Lista</div>
+      <div class="sbtab" onclick="goTab('analytics')">Stats</div>
     </div>
 
-    <!-- FILTROS -->
     <div class="tab-pane active" id="tab-filters">
       <div class="filters">
-
         <div>
-          <div class="flabel">🚗 Placa</div>
-          <input class="finput" id="f-placa" placeholder="Buscar placa…" oninput="applyFilters()"/>
+          <div class="flabel">🚗 Buscar Placa</div>
+          <input class="finput" id="f-placa" placeholder="Digite a placa…" oninput="applyFilters()"/>
         </div>
-
         <div>
           <div class="flabel">📡 Operadora</div>
-          <div class="chip-group" id="chips-op">
-            <div class="chip active" data-val="" onclick="chipOp(this)">Todas</div>
-            <div class="chip" data-val="ALGAR" onclick="chipOp(this)">ALGAR</div>
-            <div class="chip" data-val="BRISANET" onclick="chipOp(this)">BRISANET</div>
-            <div class="chip" data-val="CLARO" onclick="chipOp(this)">CLARO</div>
-            <div class="chip" data-val="SERCOMTEL" onclick="chipOp(this)">SERCOMTEL</div>
-            <div class="chip" data-val="TIM" onclick="chipOp(this)">TIM</div>
-            <div class="chip" data-val="UNIFIQUE" onclick="chipOp(this)">UNIFIQUE</div>
-            <div class="chip" data-val="VIVO" onclick="chipOp(this)">VIVO</div>
+          <div class="chips" id="chips-op">
+            <div class="chip on" data-v="" onclick="pickOp(this)">Todas</div>
+            <div class="chip" data-v="ALGAR" onclick="pickOp(this)">ALGAR</div>
+            <div class="chip" data-v="BRISANET" onclick="pickOp(this)">BRISANET</div>
+            <div class="chip" data-v="CLARO" onclick="pickOp(this)">CLARO</div>
+            <div class="chip" data-v="SERCOMTEL" onclick="pickOp(this)">SERCOMTEL</div>
+            <div class="chip" data-v="TIM" onclick="pickOp(this)">TIM</div>
+            <div class="chip" data-v="UNIFIQUE" onclick="pickOp(this)">UNIFIQUE</div>
+            <div class="chip" data-v="VIVO" onclick="pickOp(this)">VIVO</div>
           </div>
         </div>
-
         <div>
-          <div class="flabel">📶 Tecnologia ERB</div>
-          <div class="chip-group" id="chips-tec">
-            <div class="chip tec-chip active" data-val="" onclick="chipTec(this)">Todas</div>
-            <div class="chip tec-chip" data-val="2G" onclick="chipTec(this)">2G</div>
-            <div class="chip tec-chip" data-val="3G" onclick="chipTec(this)">3G</div>
-            <div class="chip tec-chip" data-val="4G" onclick="chipTec(this)">4G</div>
-            <div class="chip tec-chip" data-val="5G" onclick="chipTec(this)">5G</div>
+          <div class="flabel">📶 Tecnologia</div>
+          <div class="chips" id="chips-tec">
+            <div class="chip tec on" data-v="" onclick="pickTec(this)">Todas</div>
+            <div class="chip tec" data-v="2G" onclick="pickTec(this)">2G</div>
+            <div class="chip tec" data-v="3G" onclick="pickTec(this)">3G</div>
+            <div class="chip tec" data-v="4G" onclick="pickTec(this)">4G</div>
+            <div class="chip tec" data-v="5G" onclick="pickTec(this)">5G</div>
           </div>
         </div>
-
         <div>
-          <div class="flabel">📅 Dias Offline</div>
-          <div class="chip-group">
-            <div class="chip active" id="df-all" onclick="setDiasFiltro('')">Todos</div>
-            <div class="chip" id="df-rec" onclick="setDiasFiltro('rec')">≤2 dias</div>
-            <div class="chip" id="df-med" onclick="setDiasFiltro('med')">2–7 dias</div>
-            <div class="chip" id="df-crit" onclick="setDiasFiltro('crit')">&gt;7 dias</div>
+          <div class="flabel">⏱ Dias Offline</div>
+          <div class="chips">
+            <div class="chip on" id="df-" onclick="pickDias(this,'')">Todos</div>
+            <div class="chip" id="df-rec" onclick="pickDias(this,'rec')">≤ 2d</div>
+            <div class="chip" id="df-med" onclick="pickDias(this,'med')">2–7d</div>
+            <div class="chip" id="df-crit" onclick="pickDias(this,'crit')">&gt;7d</div>
           </div>
         </div>
-
         <div>
-          <div class="flabel">📏 Raio de Busca (ERBs)</div>
-          <div class="slider-row">
-            <input type="range" id="radius-sl" min="1" max="100" value="20" step="1" oninput="updateRadius()"/>
-            <span class="range-val"><span id="radius-v">20</span> km</span>
+          <div class="flabel">📏 Raio de Cobertura</div>
+          <div class="srow">
+            <input type="range" id="rsl" min="1" max="100" value="20" oninput="updateRadius()"/>
+            <span class="rval"><span id="rv">20</span> km</span>
           </div>
         </div>
-
         <div>
-          <div class="flabel">🗺️ Visualização</div>
-          <div class="view-btns">
+          <div class="flabel">🗺️ Modo do Mapa</div>
+          <div class="vbtns">
             <button class="vbtn active" id="vm-pins" onclick="setView('pins')">Pins</button>
             <button class="vbtn" id="vm-heat" onclick="setView('heat')">Calor</button>
             <button class="vbtn" id="vm-both" onclick="setView('both')">Ambos</button>
           </div>
         </div>
-
       </div>
-
-      <div class="sb-footer">
+      <div class="sbfoot">
         <div>
-          <div class="flabel">Veículos Offline</div>
-          <div class="counter-big" id="cnt-main">—</div>
+          <div class="clbl">Veículos offline</div>
+          <div class="cbig" id="cnt-main">—</div>
         </div>
-        <div style="margin-left:auto;text-align:right">
-          <div class="flabel" style="margin-bottom:3px">Com cobertura</div>
-          <div style="font-family:var(--mono);font-size:14px;color:var(--green)" id="cnt-cov">—</div>
-          <div class="flabel" style="margin-top:4px;margin-bottom:3px">Sem cobertura</div>
-          <div style="font-family:var(--mono);font-size:14px;color:var(--muted)" id="cnt-nocov">—</div>
+        <div style="margin-left:auto;text-align:right;font-size:9px;line-height:1.7">
+          <div style="color:var(--green)" id="cnt-cov">— com cobertura</div>
+          <div style="color:var(--muted)" id="cnt-nocov">— sem cobertura</div>
         </div>
       </div>
     </div>
 
-    <!-- LISTA -->
     <div class="tab-pane" id="tab-list">
-      <div class="list-header">
-        <div class="flabel">Ordenado por dias offline</div>
-        <div class="sub" id="list-sub">—</div>
+      <div class="lhdr">
+        <div class="flabel">Ordenado por dias offline ↓</div>
+        <div class="lsub" id="lsub">Carregue os dados…</div>
       </div>
       <div class="vlist" id="vlist">
-        <div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">Carregue os dados para ver a lista.</div>
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:10px;font-family:var(--mono)">Carregue um CSV de frota.</div>
       </div>
     </div>
 
-    <!-- ANALYTICS -->
     <div class="tab-pane" id="tab-analytics">
-      <div class="analytics-body" id="analytics-body">
-        <div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">Carregue os dados para ver as estatísticas.</div>
+      <div class="abody" id="abody">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:10px;font-family:var(--mono)">Carregue os dados.</div>
       </div>
-      <div class="export-row">
-        <button class="btn-exp" onclick="exportCSV()">📥 CSV</button>
-        <button class="btn-exp" onclick="exportKML()">🗺️ KML</button>
+      <div class="exprow">
+        <button class="bexp" onclick="exportCSV()">📥 CSV</button>
+        <button class="bexp" onclick="exportKML()">🗺️ KML</button>
       </div>
     </div>
   </div>
@@ -622,631 +317,578 @@ input[type=range]::-webkit-slider-thumb{
   <div class="map-area">
     <div id="map"></div>
 
-    <!-- ERB layer toggle -->
-    <div class="erb-toggle">
-      <button class="erbtn active" id="erb-on" onclick="toggleERBs(true)">ERBs On</button>
-      <button class="erbtn" id="erb-off" onclick="toggleERBs(false)">ERBs Off</button>
+    <div class="erbtog">
+      <button class="erbtn active" id="erb-on"  onclick="toggleERBs(true)">ERBs ●</button>
+      <button class="erbtn"        id="erb-off" onclick="toggleERBs(false)">ERBs ○</button>
     </div>
 
-    <!-- ERB info -->
-    <div class="erb-bar" id="erb-bar" style="display:none">
-      <div class="etitle">Cobertura no Ponto</div>
-      <div id="erb-bar-content" style="font-size:10px;color:var(--text2)">Clique em um veículo</div>
+    <div class="erbinfo" id="erbbox">
+      <div class="et">Cobertura no Veículo</div>
+      <div id="erbbox-txt" style="color:var(--text2)">Clique num veículo</div>
     </div>
 
     <div class="legend">
-      <div class="leg-title">Dias Offline</div>
-      <div class="leg-item"><div class="leg-dot" style="background:#3b82f6"></div> Recente (≤2 dias)</div>
-      <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div> Médio (2–7 dias)</div>
-      <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div> Crítico (&gt;7 dias)</div>
-      <div class="leg-sep"></div>
-      <div class="leg-item"><div class="leg-dot" style="background:#10b981"></div> Com cobertura</div>
-      <div class="leg-item"><div class="leg-dot" style="background:#4b5563"></div> Sem cobertura</div>
+      <div class="leg-t">Dias Offline</div>
+      <div class="legi"><div class="legdot" style="background:#3b82f6"></div>Recente (≤2d)</div>
+      <div class="legi"><div class="legdot" style="background:#f59e0b"></div>Médio (2–7d)</div>
+      <div class="legi"><div class="legdot" style="background:#ef4444"></div>Crítico (&gt;7d)</div>
+      <div class="legsep"></div>
+      <div class="legi"><div class="legdot" style="border:2px solid #10b981;background:transparent"></div>Com cobertura</div>
+      <div class="legi"><div class="legdot" style="border:2px solid #374151;background:transparent"></div>Sem cobertura</div>
+      <div class="legsep"></div>
+      <div class="legi"><div class="legdot" style="background:#8b5cf6;width:6px;height:6px"></div>ERB VIVO</div>
+      <div class="legi"><div class="legdot" style="background:#ef4444;width:6px;height:6px"></div>ERB CLARO</div>
+      <div class="legi"><div class="legdot" style="background:#3b82f6;width:6px;height:6px"></div>ERB TIM</div>
+      <div class="legi"><div class="legdot" style="background:#10b981;width:6px;height:6px"></div>ERB outros</div>
     </div>
   </div>
 </div>
 
 <script>
-// ── ERB URL publicado ─────────────────────────────────────────────────────────
-const ERB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRh4-Zi5a-Bmkasie4JUSePKNimtGcasgvRTa2uBn-wIhSEAMha3-jYeaz6Tx6L3VBfjjG3jU1Cstnd/pub?output=csv';
+// ─────────────────────────────────────────────────────────────────────────────
+// Cores por operadora
+const OP_COLOR={
+  'VIVO':'#8b5cf6','TIM':'#3b82f6','CLARO':'#ef4444','OI':'#f59e0b',
+  'ALGAR':'#10b981','BRISANET':'#ec4899','SERCOMTEL':'#06b6d4',
+  'UNIFIQUE':'#84cc16','NEXTEL':'#f97316'
+};
+const opColor = op => OP_COLOR[(op||'').toUpperCase().trim()] || '#4b5563';
 
-// ── State ──────────────────────────────────────────────────────────────────────
-let allVeiculos = [];
-let allERBs     = [];
-let filteredV   = [];
-let markers     = [];
-let erbMarkers  = [];
-let heatLayer   = null;
-let viewMode    = 'pins';
-let erbVisible  = true;
-let selectedId  = null;
-let radiusKm    = 20;
-let map;
+// ─── Estado ───────────────────────────────────────────────────────────────────
+let allV=[], allERBs=[], filtV=[];
+let vMarkers=[], heatL=null;
+let erbCluster=null;
+let erbVisible=true, selId=null, radiusKm=20;
+let viewMode='pins', fOp='', fTec='', fDias='', fPlaca='';
+let map, erbData=[];
 
-let filterOp   = '';
-let filterTec  = '';
-let filterDias = '';
-let filterPlaca = '';
+// ─── Inicializa mapa ──────────────────────────────────────────────────────────
+function initMap(){
+  map = L.map('map',{
+    center:[-15,-52], zoom:5,
+    preferCanvas: true,
+    zoomControl: true
+  });
 
-// ── Map init ───────────────────────────────────────────────────────────────────
-function initMap() {
-  map = L.map('map', { center: [-15, -52], zoom: 5 });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', {
-    attribution: '©OpenStreetMap ©CARTO', subdomains: 'abcd', maxZoom: 19
+  // Tile layer OpenStreetMap padrão (mais compatível)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:19,
+    subdomains:['a','b','c']
   }).addTo(map);
 
-  setTimeout(() => document.getElementById('overlay').classList.add('hide'), 700);
-  loadERBs();
+  // Fallback: se OSM falhar, carrega CartoDB Dark
+  map.on('tileerror', function(){
+    map.eachLayer(function(l){if(l instanceof L.TileLayer) map.removeLayer(l);});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png',{
+      attribution:'©OpenStreetMap ©CARTO',subdomains:'abcd',maxZoom:19
+    }).addTo(map);
+  });
+
+  setTimeout(()=>{ document.getElementById('ov').classList.add('hide'); },800);
 }
 
-// ── Load ERBs ─────────────────────────────────────────────────────────────────
-function loadERBs() {
-  setStatus('⏳ Carregando ERBs…');
-  Papa.parse(ERB_URL, {
-    download: true, header: true, skipEmptyLines: true,
-    complete: r => {
-      allERBs = processERBs(r.data);
-      document.getElementById('h-erbs').textContent = allERBs.length;
-      setStatus(`✅ ${allERBs.length} ERBs + aguardando frota`);
-      renderERBLayer();
-      toast(`📡 ${allERBs.length} ERBs carregadas`);
+// ─── Carrega CSV ──────────────────────────────────────────────────────────────
+function loadURL(){
+  const url=document.getElementById('csv-url').value.trim();
+  if(!url){toast('Cole a URL do CSV!');return;}
+  setSt('⏳ Baixando frota…');
+  Papa.parse(url,{
+    download:true,header:true,skipEmptyLines:true,
+    complete:r=>processV(r.data),
+    error:e=>setSt('❌ '+e.message)
+  });
+}
+
+function loadFile(ev, tipo){
+  const f=ev.target.files[0]; if(!f) return;
+  setSt(`⏳ Lendo ${tipo}…`);
+
+  if(tipo==='erbs'){
+    // Para ERBs grandes, usa streaming
+    loadERBsStream(f);
+  } else {
+    Papa.parse(f,{
+      header:true,skipEmptyLines:true,
+      complete:r=>processV(r.data),
+      error:e=>setSt('❌ '+e.message)
+    });
+  }
+}
+
+// ─── Carrega ERBs via streaming (100k+ linhas) ────────────────────────────────
+function loadERBsStream(file){
+  allERBs=[];
+  let rowCount=0;
+  const totalEstimate = Math.floor(file.size / 120); // estimativa ~120 bytes/linha
+
+  showOv('Carregando ERBs…');
+  setSt('⏳ Processando ERBs…');
+
+  Papa.parse(file,{
+    header:true,
+    skipEmptyLines:true,
+    chunk: function(results, parser){
+      results.data.forEach(row=>{
+        const e=parseERBRow(row);
+        if(e) allERBs.push(e);
+        rowCount++;
+      });
+      const pct = Math.min(99, Math.round(rowCount/totalEstimate*100));
+      setProgress(pct);
+      setOvMsg(`${rowCount.toLocaleString('pt-BR')} linhas…`);
+      setOvPct(pct+'%');
     },
-    error: () => setStatus('⚠️ ERBs indisponíveis')
+    complete: function(){
+      setProgress(100);
+      finishERBs();
+      setTimeout(()=>setProgress(0),600);
+    },
+    error: e=> setSt('❌ '+e.message)
   });
 }
 
-function processERBs(rows) {
-  const result = [];
-  rows.forEach((r, i) => {
-    const keys = Object.keys(r);
-    // Flexible column detection
-    const get = (names) => {
-      for (const n of names) {
-        const k = keys.find(k => k.trim().toUpperCase().replace(/[^A-Z0-9]/g,'').includes(n));
-        if (k && r[k]) return r[k].toString().trim();
-      }
-      return '';
-    };
-
-    let lat = parseCoord(get(['LATITUDE','LAT']));
-    let lng = parseCoord(get(['LONGITUDE','LONG','LON','LNG']));
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
-    if (lat > 15 || lat < -35) return;
-    if (lng > -30 || lng < -75) return;
-
-    const op   = get(['OPERADORA','OPERATOR','OPER']);
-    const uf   = get(['SIGLAUF','UF','ESTADO','STATE']);
-    const mun  = get(['MUN','MUNICIPIO','CIDADE','CITY']);
-    const tecs = get(['TECS','TECNOLOGIA','TECH']);
-    const faixa = get(['FAIXA','FREQUENCIA','FREQ']);
-    const classe = get(['CLASSINFRA','CLASSE','TYPE']);
-    const ibge  = get(['IBGE','COD']);
-
-    // Parse technologies
-    const tecList = [];
-    if (tecs.includes('2G') || tecs.includes('2g')) tecList.push('2G');
-    if (tecs.includes('3G') || tecs.includes('3g')) tecList.push('3G');
-    if (tecs.includes('4G') || tecs.includes('4g')) tecList.push('4G');
-    if (tecs.includes('5G') || tecs.includes('5g')) tecList.push('5G');
-
-    result.push({ id: i, lat, lng, op, uf, mun, tecs, faixa, classe, ibge, tecList });
-  });
-  return result;
+function finishERBs(){
+  const muns=new Set(allERBs.map(e=>e.mun).filter(Boolean)).size;
+  document.getElementById('h-erbs').textContent=allERBs.length.toLocaleString('pt-BR');
+  document.getElementById('h-mun').textContent=muns;
+  setSt(`✅ ${allERBs.length.toLocaleString('pt-BR')} ERBs · ${muns} municípios`);
+  toast(`📡 ${allERBs.length.toLocaleString('pt-BR')} ERBs carregadas`);
+  hideOv();
+  renderERBLayer();
+  // Recalcula cobertura se já tem frota
+  if(allV.length){
+    recalcCoverage();
+    applyFilters();
+  }
+  renderAnalytics();
 }
 
-function renderERBLayer() {
-  erbMarkers.forEach(m => m.remove());
-  erbMarkers = [];
-  if (!erbVisible) return;
-
-  const ops = new Set(allERBs.map(e => e.op).filter(Boolean));
-  const opColors = {
-    'VIVO': '#8b5cf6', 'CLARO': '#ef4444', 'TIM': '#3b82f6',
-    'OI': '#f59e0b', 'ALGAR': '#10b981', 'BRISANET': '#ec4899',
-    'SERCOMTEL': '#06b6d4', 'UNIFIQUE': '#84cc16'
-  };
-
-  const subset = filterOp
-    ? allERBs.filter(e => e.op && e.op.toUpperCase().includes(filterOp.toUpperCase()))
-    : allERBs;
-
-  const filtered = filterTec
-    ? subset.filter(e => e.tecList && e.tecList.includes(filterTec))
-    : subset;
-
-  filtered.forEach(e => {
-    const color = opColors[e.op?.toUpperCase()] || '#4b5563';
-    const icon = L.divIcon({
-      html: `<div style="width:6px;height:6px;border-radius:50%;background:${color};opacity:.7;border:1px solid rgba(255,255,255,.2)"></div>`,
-      className: '', iconSize: [6, 6], iconAnchor: [3, 3]
-    });
-    const m = L.marker([e.lat, e.lng], { icon, zIndexOffset: 50 }).addTo(map);
-    m.bindPopup(`
-      <div class="popup-inner" style="min-width:180px">
-        <div class="popup-placa" style="font-size:12px">${e.op || '—'}</div>
-        <div class="popup-row">📍 ${e.mun || '—'}/${e.uf || '—'}</div>
-        <div class="popup-row">📶 ${e.tecs || '—'}</div>
-        <div class="popup-row">🏗️ ${e.classe || '—'}</div>
-        ${e.faixa ? `<div class="popup-row">📻 ${e.faixa}</div>` : ''}
-      </div>`, { maxWidth: 220 });
-    erbMarkers.push(m);
+function parseERBRow(r){
+  const norm={};
+  Object.keys(r).forEach(k=>{
+    norm[k.replace(/^\uFEFF/,'').trim().toUpperCase()]=(r[k]||'').toString().trim();
   });
+  const latRaw=norm['LATITUDE']||norm['LAT']||'';
+  const lngRaw=norm['LONGITUDE']||norm['LONG']||norm['LNG']||'';
+
+  let lat=parseCoord(latRaw);
+  let lng=parseCoord(lngRaw);
+  if(isNaN(lat)||isNaN(lng)) return null;
+  if(lat>0&&lat<35) lat=-lat;
+  if(lng>0&&lng<80) lng=-lng;
+  if(lat>5||lat<-35) return null;
+  if(lng>-30||lng<-75) return null;
+
+  const op  =norm['OPERADORA']||norm['OP']||'';
+  const uf  =norm['SIGLAUF']||norm['UF']||'';
+  const mun =norm['MUN']||norm['MUNICIPIO']||'';
+  const tecs=norm['TECS']||norm['TECNOLOGIA']||'';
+  const faixa=norm['FAIXA']||'';
+  const classe=norm['CLASSINFRAF']||norm['CLASSINFRA']||'';
+  const tecList=[];
+  ['2G','3G','4G','5G'].forEach(t=>{ if(tecs.toUpperCase().includes(t)) tecList.push(t); });
+
+  return {lat,lng,op:op.toUpperCase(),uf,mun,tecs,faixa,classe,tecList};
 }
 
-// ── Load frota CSV ─────────────────────────────────────────────────────────────
-function loadURL() {
-  const url = document.getElementById('csv-url').value.trim();
-  if (!url) { toast('Cole a URL do CSV!'); return; }
-  setStatus('⏳ Carregando frota…');
-  Papa.parse(url, {
-    download: true, header: true, skipEmptyLines: true,
-    complete: r => processVeiculos(r.data),
-    error: e => setStatus('❌ ' + e.message)
-  });
-}
+// ─── Render ERB layer — usa Canvas + cluster otimizado ────────────────────────
+function renderERBLayer(){
+  if(erbCluster){ map.removeLayer(erbCluster); erbCluster=null; }
+  if(!erbVisible||!allERBs.length) return;
 
-function loadFile(ev) {
-  const f = ev.target.files[0];
-  if (!f) return;
-  setStatus('⏳ Lendo…');
-  Papa.parse(f, {
-    header: true, skipEmptyLines: true,
-    complete: r => processVeiculos(r.data),
-    error: e => setStatus('❌ ' + e.message)
-  });
-}
+  let subset=allERBs;
+  if(fOp)  subset=subset.filter(e=>e.op.includes(fOp.toUpperCase()));
+  if(fTec) subset=subset.filter(e=>e.tecList.includes(fTec));
 
-function processVeiculos(rows) {
-  allVeiculos = [];
-  const now = new Date();
-
-  rows.forEach((r, i) => {
-    const keys = Object.keys(r);
-    const get = (names) => {
-      for (const n of names) {
-        const k = keys.find(k => {
-          const kc = k.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
-          return names.some(n2 => kc.includes(n2.replace(/[^A-Z0-9]/g,'')));
-        });
-        if (k && r[k]) return r[k].toString().trim();
-      }
-      // Also try by column position
-      const vals = Object.values(r);
-      return '';
-    };
-
-    // Try by header name OR position (A=LAT, B=LONG, C=PLACA, D=DATA)
-    const colNames = keys;
-    const getByPos = (pos) => colNames[pos] ? (r[colNames[pos]] || '').toString().trim() : '';
-
-    // Detect header style
-    const firstKey = (keys[0]||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
-    const isPositional = firstKey === 'LAT' || firstKey === 'A' || /^-?\d/.test(Object.values(r)[0] || '');
-
-    let latRaw, lngRaw, placa, dataRaw;
-
-    if (isPositional || firstKey === 'LAT') {
-      latRaw  = getByPos(0);
-      lngRaw  = getByPos(1);
-      placa   = getByPos(2);
-      dataRaw = getByPos(3);
-    } else {
-      latRaw  = r[keys.find(k => /lat/i.test(k))] || getByPos(0);
-      lngRaw  = r[keys.find(k => /lon|lng/i.test(k))] || getByPos(1);
-      placa   = r[keys.find(k => /placa|plate/i.test(k))] || getByPos(2);
-      dataRaw = r[keys.find(k => /parou|data|stopped|date/i.test(k))] || getByPos(3);
+  erbCluster=L.markerClusterGroup({
+    maxClusterRadius:50,
+    disableClusteringAtZoom:14,
+    spiderfyOnMaxZoom:true,
+    chunkedLoading:true,
+    chunkSize:800,
+    chunkInterval:30,
+    iconCreateFunction:function(cluster){
+      const count=cluster.getChildCount();
+      const sz=count<100?32:count<1000?40:50;
+      return L.divIcon({
+        html:`<div style="
+          background:rgba(139,92,246,.35);border:2px solid rgba(139,92,246,.7);
+          border-radius:50%;width:${sz}px;height:${sz}px;
+          display:flex;align-items:center;justify-content:center;
+          font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#fff;
+          box-shadow:0 0 8px rgba(139,92,246,.4);
+        ">${count>9999?(count/1000).toFixed(1)+'k':count>999?Math.round(count/1000)+'k':count}</div>`,
+        className:'',iconSize:[sz,sz]
+      });
     }
-
-    let lat = parseCoord(latRaw);
-    let lng = parseCoord(lngRaw);
-
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
-    if (lat > 15 || lat < -35) { if (lat < 15 && lat > -15 && lng > -75 && lng < -30) {} else return; }
-    if (lng > -25 || lng < -75) return;
-
-    // Parse date
-    let diasOffline = 0;
-    let dataStr = (dataRaw || '').trim();
-    if (dataStr) {
-      // Try multiple formats: DD/MM/YYYY, DD/MM/YY, MM/DD/YYYY, ISO
-      let d = null;
-      const patterns = [
-        // DD/MM/YYYY HH:MM or DD/MM/YY
-        /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/,
-      ];
-      const m = dataStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-      if (m) {
-        let year = parseInt(m[3]);
-        if (year < 100) year += 2000;
-        // Assume DD/MM
-        d = new Date(year, parseInt(m[2]) - 1, parseInt(m[1]));
-      } else {
-        d = new Date(dataStr);
-      }
-      if (d && !isNaN(d.getTime())) {
-        diasOffline = Math.round((now - d) / (1000 * 60 * 60 * 24));
-        if (diasOffline < 0) diasOffline = 0;
-      }
-    }
-
-    const categoria = diasOffline <= 2 ? 'rec' : diasOffline <= 7 ? 'med' : 'crit';
-
-    // Check ERB coverage
-    const nearERBs = allERBs.filter(e => haversine(lat, lng, e.lat, e.lng) <= radiusKm);
-    const hasCoverage = nearERBs.length > 0;
-
-    allVeiculos.push({
-      id: i, lat, lng,
-      placa: placa || `VH-${i+1}`,
-      dataParou: dataStr,
-      diasOffline, categoria, hasCoverage, nearERBs
-    });
   });
 
-  // Update headers
-  const crit = allVeiculos.filter(v => v.categoria === 'crit').length;
-  const med  = allVeiculos.filter(v => v.categoria === 'med').length;
-  document.getElementById('h-total').textContent = allVeiculos.length;
-  document.getElementById('h-crit').textContent  = crit;
-  document.getElementById('h-med').textContent   = med;
+  // Adiciona em chunks assíncronos
+  const CHUNK=2000;
+  let i=0;
+  function addChunk(){
+    const end=Math.min(i+CHUNK,subset.length);
+    const batch=[];
+    for(;i<end;i++){
+      const e=subset[i];
+      const m=L.circleMarker([e.lat,e.lng],{
+        radius:3,
+        fillColor:opColor(e.op),fillOpacity:0.75,
+        color:'rgba(0,0,0,0)',weight:0
+      });
+      m.bindPopup(`
+        <div class="pi" style="min-width:160px">
+          <div class="pp" style="font-size:12px">${e.op||'—'}</div>
+          <div class="prow">📍 ${e.mun||'—'} / ${e.uf||'—'}</div>
+          <div class="prow">📶 ${e.tecs||'—'}</div>
+          <div class="prow">🏗️ ${e.classe||'—'}</div>
+          ${e.faixa?`<div class="prow">📻 ${e.faixa}</div>`:''}
+        </div>`,{maxWidth:200});
+      batch.push(m);
+    }
+    erbCluster.addLayers(batch);
+    if(i<subset.length) setTimeout(addChunk,0);
+  }
+  map.addLayer(erbCluster);
+  addChunk();
+  setSt(`📡 ${subset.length.toLocaleString('pt-BR')} ERBs visíveis`);
+}
 
-  setStatus(`✅ ${allVeiculos.length} veículos carregados`);
-  toast(`🚗 ${allVeiculos.length} veículos offline carregados`);
+// ─── Frota ────────────────────────────────────────────────────────────────────
+function processV(rows){
+  allV=[];
+  const now=new Date();
+  rows.forEach((r,i)=>{
+    const norm={};
+    Object.keys(r).forEach(k=>{ norm[k.replace(/^\uFEFF/,'').trim().toUpperCase()]=(r[k]||'').toString().trim(); });
 
+    let latRaw=norm['LAT']||norm['LATITUDE']||'';
+    let lngRaw=norm['LONG']||norm['LONGITUDE']||norm['LNG']||'';
+    let placa =norm['PLACA']||norm['PLATE']||'';
+    let dataRaw=norm['PAROU DE COMUNICAR']||norm['PAROU']||norm['DATA']||norm['STOPPED']||norm['DATE']||'';
+
+    // fallback posicional
+    const keys=Object.keys(r);
+    if(!latRaw && keys[0]) latRaw=(r[keys[0]]||'').toString().trim();
+    if(!lngRaw && keys[1]) lngRaw=(r[keys[1]]||'').toString().trim();
+    if(!placa  && keys[2]) placa =(r[keys[2]]||'').toString().trim();
+    if(!dataRaw&& keys[3]) dataRaw=(r[keys[3]]||'').toString().trim();
+    if(latRaw.toUpperCase()==='LAT'||latRaw.toUpperCase()==='LATITUDE') return;
+
+    let lat=parseCoord(latRaw), lng=parseCoord(lngRaw);
+    if(isNaN(lat)||isNaN(lng)||(lat===0&&lng===0)) return;
+    if(lat>0&&lat<35) lat=-lat;
+    if(lng>0&&lng<80) lng=-lng;
+    if(lat>5||lat<-35) return;
+    if(lng>-30||lng<-75) return;
+
+    let dias=0;
+    if(dataRaw){
+      let d=null;
+      const m1=dataRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+      if(m1){
+        let y=parseInt(m1[3]); if(y<100) y+=2000;
+        d=new Date(y,parseInt(m1[2])-1,parseInt(m1[1]));
+        if(isNaN(d.getTime())) d=new Date(y,parseInt(m1[1])-1,parseInt(m1[2]));
+      } else { d=new Date(dataRaw); }
+      if(d&&!isNaN(d.getTime())) dias=Math.max(0,Math.round((now-d)/864e5));
+    }
+    const cat=dias<=2?'rec':dias<=7?'med':'crit';
+    const near=allERBs.filter(e=>haversine(lat,lng,e.lat,e.lng)<=radiusKm);
+    allV.push({id:i,lat,lng,placa:placa||`VH-${i+1}`,dataStr:dataRaw,dias,cat,near,cov:near.length>0});
+  });
+
+  document.getElementById('h-total').textContent=allV.length;
+  document.getElementById('h-crit').textContent=allV.filter(v=>v.cat==='crit').length;
+  document.getElementById('h-med').textContent=allV.filter(v=>v.cat==='med').length;
+  setSt(`✅ ${allV.length} veículos`);
+  toast(`🚗 ${allV.length} veículos offline`);
   applyFilters();
   renderAnalytics();
 }
 
-// ── Filters ────────────────────────────────────────────────────────────────────
-function applyFilters() {
-  filteredV = allVeiculos.filter(v => {
-    if (filterPlaca && !v.placa.toLowerCase().includes(filterPlaca.toLowerCase())) return false;
-    if (filterDias === 'rec'  && v.categoria !== 'rec')  return false;
-    if (filterDias === 'med'  && v.categoria !== 'med')  return false;
-    if (filterDias === 'crit' && v.categoria !== 'crit') return false;
-    // Op & Tec filter: recheck ERBs
-    if (filterOp || filterTec) {
-      const nearFiltered = v.nearERBs.filter(e => {
-        if (filterOp  && !(e.op||'').toUpperCase().includes(filterOp.toUpperCase()))  return false;
-        if (filterTec && !e.tecList.includes(filterTec)) return false;
+function recalcCoverage(){
+  allV.forEach(v=>{
+    v.near=allERBs.filter(e=>haversine(v.lat,v.lng,e.lat,e.lng)<=radiusKm);
+    v.cov=v.near.length>0;
+  });
+}
+
+// ─── Filtros ──────────────────────────────────────────────────────────────────
+function applyFilters(){
+  fPlaca=document.getElementById('f-placa').value.trim().toLowerCase();
+  filtV=allV.filter(v=>{
+    if(fPlaca && !v.placa.toLowerCase().includes(fPlaca)) return false;
+    if(fDias && v.cat!==fDias) return false;
+    if(fOp||fTec){
+      const nr=v.near.filter(e=>{
+        if(fOp  && !e.op.includes(fOp))      return false;
+        if(fTec && !e.tecList.includes(fTec)) return false;
         return true;
       });
-      // Still show vehicle but update coverage
-      v.hasCoverageFiltered = nearFiltered.length > 0;
-      v.nearERBsFiltered = nearFiltered;
+      v.nearF=nr; v.covF=nr.length>0;
     } else {
-      v.hasCoverageFiltered = v.hasCoverage;
-      v.nearERBsFiltered = v.nearERBs;
+      v.nearF=v.near; v.covF=v.cov;
     }
     return true;
   });
+  filtV.sort((a,b)=>b.dias-a.dias);
 
-  filteredV.sort((a, b) => b.diasOffline - a.diasOffline);
-
-  const withCov    = filteredV.filter(v => v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage).length;
-  const withoutCov = filteredV.length - withCov;
-
-  document.getElementById('cnt-main').textContent  = filteredV.length;
-  document.getElementById('cnt-cov').textContent   = withCov;
-  document.getElementById('cnt-nocov').textContent = withoutCov;
-  document.getElementById('list-sub').textContent  = `${filteredV.length} veículos — ${withCov} com cobertura`;
+  const wc=filtV.filter(v=>v.covF).length;
+  const wn=filtV.length-wc;
+  document.getElementById('cnt-main').textContent=filtV.length;
+  document.getElementById('cnt-cov').textContent=wc+' com cobertura';
+  document.getElementById('cnt-nocov').textContent=wn+' sem cobertura';
+  document.getElementById('lsub').textContent=`${filtV.length} veículos — ${wc} com cobertura`;
 
   renderVehicles();
   renderList();
   renderERBLayer();
 }
 
-// ── Map render ─────────────────────────────────────────────────────────────────
-function renderVehicles() {
-  markers.forEach(m => m.remove());
-  markers = [];
-  if (heatLayer) { heatLayer.remove(); heatLayer = null; }
+// ─── Render veículos ──────────────────────────────────────────────────────────
+function renderVehicles(){
+  vMarkers.forEach(m=>map.removeLayer(m));
+  vMarkers=[];
+  if(heatL){map.removeLayer(heatL);heatL=null;}
+  if(!filtV.length) return;
 
-  if (filteredV.length === 0) return;
+  const COL={rec:'#3b82f6',med:'#f59e0b',crit:'#ef4444'};
 
-  const catColor = { rec: '#3b82f6', med: '#f59e0b', crit: '#ef4444' };
-
-  if (viewMode === 'heat' || viewMode === 'both') {
-    const pts = filteredV.map(v => [v.lat, v.lng, v.diasOffline > 30 ? 1 : v.diasOffline / 30]);
-    heatLayer = L.heatLayer(pts, {
-      radius: 28, blur: 18, maxZoom: 17,
-      gradient: { 0.2: '#3b82f6', 0.5: '#f59e0b', 0.8: '#ef4444', 1.0: '#7f1d1d' }
+  if(viewMode==='heat'||viewMode==='both'){
+    const pts=filtV.map(v=>[v.lat,v.lng,Math.min(1,v.dias/60+0.15)]);
+    heatL=L.heatLayer(pts,{
+      radius:28,blur:18,maxZoom:17,
+      gradient:{0.2:'#3b82f6',0.5:'#f59e0b',0.8:'#ef4444',1:'#7f1d1d'}
     }).addTo(map);
   }
 
-  if (viewMode === 'pins' || viewMode === 'both') {
-    filteredV.forEach(v => {
-      const col  = catColor[v.categoria];
-      const cov  = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
-      const size = v.categoria === 'crit' ? 22 : 18;
-
-      const icon = L.divIcon({
-        html: `<div style="
-          width:${size}px;height:${size}px;border-radius:50%;
-          background:${col};border:2px solid ${cov ? '#10b981' : 'rgba(255,255,255,.15)'};
-          box-shadow:0 0 ${v.categoria === 'crit' ? 10 : 5}px ${col}88;
-          display:flex;align-items:center;justify-content:center;
-          font-size:${size*.45}px;
-        ">🚗</div>`,
-        className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
+  if(viewMode==='pins'||viewMode==='both'){
+    filtV.forEach(v=>{
+      const c=COL[v.cat];
+      const sz=v.cat==='crit'?20:v.cat==='med'?16:13;
+      const bord=v.covF?'#10b981':'#374151';
+      const icon=L.divIcon({
+        html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${c};border:2px solid ${bord};display:flex;align-items:center;justify-content:center;font-size:${Math.floor(sz*.5)}px;box-shadow:0 0 6px ${c}88;">🚗</div>`,
+        className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
       });
-
-      const m = L.marker([v.lat, v.lng], { icon, zIndexOffset: v.diasOffline }).addTo(map);
-      m.bindPopup(buildPopup(v), { maxWidth: 310 });
-      m.on('click', () => { selectedId = v.id; showERBBar(v); });
-      markers.push(m);
+      const m=L.marker([v.lat,v.lng],{icon,zIndexOffset:v.dias}).addTo(map);
+      m.bindPopup(buildPopup(v),{maxWidth:290});
+      m.on('click',()=>{selId=v.id;showErbBox(v);renderList();});
+      vMarkers.push(m);
     });
   }
 }
 
-function buildPopup(v) {
-  const cat = { rec: 'rec', med: 'med', crit: 'crit' }[v.categoria];
-  const catLabel = { rec: '≤2 DIAS', med: '2–7 DIAS', crit: `${v.diasOffline} DIAS` }[v.categoria];
-  const catBg = { rec: 'rgba(59,130,246,.18)', med: 'rgba(245,158,11,.18)', crit: 'rgba(239,68,68,.18)' }[v.categoria];
-  const catColor = { rec: '#93c5fd', med: '#fcd34d', crit: '#fca5a5' }[v.categoria];
-
-  const nearERBs = v.nearERBsFiltered || v.nearERBs;
-  const hasCov   = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
-
-  // Group by operator
-  const byOp = {};
-  nearERBs.slice(0, 30).forEach(e => {
-    if (!byOp[e.op]) byOp[e.op] = { tecs: new Set(), count: 0 };
-    byOp[e.op].count++;
-    e.tecList.forEach(t => byOp[e.op].tecs.add(t));
+function buildPopup(v){
+  const catBg ={rec:'rgba(59,130,246,.18)',med:'rgba(245,158,11,.18)',crit:'rgba(239,68,68,.18)'}[v.cat];
+  const catCol={rec:'#93c5fd',med:'#fcd34d',crit:'#fca5a5'}[v.cat];
+  const catLbl={rec:'RECENTE',med:'MÉDIO',crit:'CRÍTICO'}[v.cat];
+  const nr=v.nearF||v.near;
+  const hasCov=v.covF!==undefined?v.covF:v.cov;
+  const byOp={};
+  nr.slice(0,40).forEach(e=>{
+    if(!byOp[e.op]) byOp[e.op]={tecs:new Set(),n:0};
+    byOp[e.op].n++; e.tecList.forEach(t=>byOp[e.op].tecs.add(t));
   });
-
-  const opHtml = Object.entries(byOp).slice(0, 6).map(([op, d]) => `
-    <div class="op-row">
-      <span class="op-name">${op || '—'}</span>
-      <div class="op-tecs">
-        ${[...d.tecs].map(t => `<span class="tec-tag tec-${t.toLowerCase()}">${t}</span>`).join('')}
-      </div>
+  const opHtml=Object.entries(byOp).slice(0,5).map(([op,d])=>`
+    <div class="oprow">
+      <span class="opname">${op||'—'} <span style="color:var(--muted);font-size:8px">(${d.n})</span></span>
+      <div class="optecs">${[...d.tecs].sort().map(t=>`<span class="tt t${t.toLowerCase()}">${t}</span>`).join('')}</div>
     </div>`).join('');
-
   return `
-    <div class="popup-inner">
-      <div class="popup-placa">${v.placa}</div>
-      <span class="popup-badge" style="background:${catBg};color:${catColor};border:1px solid ${catColor}44">
-        ⏱ ${catLabel} OFFLINE
-      </span>
-      <div class="popup-row">📅 Parou: ${v.dataParou || '—'}</div>
-      <div class="popup-coord">📍 ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}</div>
-      <div class="popup-div"></div>
-      <div class="popup-sec">Cobertura de Rede (${radiusKm}km)</div>
-      <div class="popup-erbs">
-        ${hasCov
-          ? `<span class="erb-chip ok">✓ Cobertura confirmada</span>`
-          : `<span class="erb-chip no">✗ Sem cobertura</span>`}
-        <span class="erb-chip ok" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#93c5fd">${nearERBs.length} ERBs no raio</span>
+    <div class="pi">
+      <div class="pp">${v.placa}</div>
+      <span class="pbadge" style="background:${catBg};color:${catCol};border:1px solid ${catCol}44">⏱ ${v.dias}d — ${catLbl}</span>
+      <div class="prow">📅 Parou: ${v.dataStr||'—'}</div>
+      <div class="pcoord">📍 ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}</div>
+      <div class="pdiv"></div>
+      <div class="psec">Cobertura (raio ${radiusKm} km)</div>
+      <div class="perbs">
+        ${hasCov?`<span class="ec ok">✓ Cobertura confirmada</span>`:`<span class="ec no">✗ Sem cobertura</span>`}
+        <span class="ec" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${nr.length} ERBs</span>
       </div>
-      ${nearERBs.length > 0 ? `
-        <div class="popup-sec" style="margin-top:6px">Por Operadora</div>
-        <div class="popup-ops">${opHtml}</div>` : ''}
+      ${nr.length&&allERBs.length?`<div class="psec" style="margin-top:5px">Por Operadora</div><div class="ops">${opHtml}</div>`:''}
     </div>`;
 }
 
-function showERBBar(v) {
-  const bar = document.getElementById('erb-bar');
-  const cov = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
-  const near = v.nearERBsFiltered || v.nearERBs;
-  bar.style.display = 'block';
-  document.getElementById('erb-bar-content').innerHTML = `
-    <div style="margin-bottom:4px">${v.placa}</div>
-    <div style="color:${cov ? '#10b981' : '#4b5563'};margin-bottom:4px">${cov ? '✓ Com cobertura' : '✗ Sem cobertura'}</div>
-    <div style="color:var(--text)">${near.length} ERBs em ${radiusKm}km</div>
-  `;
+function showErbBox(v){
+  const nr=v.nearF||v.near;
+  const hasCov=v.covF!==undefined?v.covF:v.cov;
+  document.getElementById('erbbox-txt').innerHTML=`
+    <div style="color:var(--text);font-weight:700;margin-bottom:2px">${v.placa}</div>
+    <div style="color:${hasCov?'#10b981':'#4b5563'};margin-bottom:2px">${hasCov?'✓ Com cobertura':'✗ Sem cobertura'}</div>
+    <div>${nr.length} ERBs em ${radiusKm}km · ${v.dias}d offline</div>`;
 }
 
-// ── List render ────────────────────────────────────────────────────────────────
-function renderList() {
-  const el = document.getElementById('vlist');
-  if (filteredV.length === 0) {
-    el.innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted);font-size:11px;font-family:var(--mono)">Nenhum veículo encontrado.</div>`;
+// ─── Lista ────────────────────────────────────────────────────────────────────
+function renderList(){
+  const el=document.getElementById('vlist');
+  if(!filtV.length){
+    el.innerHTML=`<div style="padding:20px;text-align:center;color:var(--muted);font-size:10px;font-family:var(--mono)">Nenhum veículo encontrado.</div>`;
     return;
   }
-
-  el.innerHTML = filteredV.slice(0, 80).map(v => {
-    const cat = { rec: 'rec', med: 'med', crit: 'crit' }[v.categoria];
-    const label = v.diasOffline + 'd';
-    const cov = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
-    return `
-      <div class="vcard ${selectedId === v.id ? 'sel' : ''}" onclick="focusV(${v.id}, ${v.lat}, ${v.lng})">
-        <div class="vcard-placa">${v.placa}</div>
-        <span class="badge-dias ${cat}">${label}</span>
-        <div class="vcard-meta">
-          <span style="color:${cov ? '#10b981' : '#4b5563'}">${cov ? '● Cobertura' : '○ Sem cob.'}</span>
-          <span>📅 ${v.dataParou || '—'}</span>
-        </div>
-      </div>`;
+  el.innerHTML=filtV.slice(0,150).map(v=>{
+    const cov=v.covF!==undefined?v.covF:v.cov;
+    return `<div class="vcard ${selId===v.id?'sel':''}" onclick="focusV(${v.id},${v.lat},${v.lng})">
+      <div class="vcard-placa">${v.placa}</div>
+      <span class="bdias ${v.cat}">${v.dias}d</span>
+      <div class="vcard-meta">
+        <span style="color:${cov?'#10b981':'#4b5563'}">${cov?'● Cob.':'○ Sem'}</span>
+        <span>${v.dataStr||'—'}</span>
+      </div>
+    </div>`;
   }).join('');
 }
 
-function focusV(id, lat, lng) {
-  selectedId = id;
-  map.setView([lat, lng], 13);
-  markers.forEach(m => {
-    if (Math.abs(m.getLatLng().lat - lat) < 0.0005 && Math.abs(m.getLatLng().lng - lng) < 0.0005) {
-      m.openPopup();
-    }
+function focusV(id,lat,lng){
+  selId=id;
+  map.setView([lat,lng],14);
+  vMarkers.forEach(m=>{
+    const ll=m.getLatLng();
+    if(Math.abs(ll.lat-lat)<0.0005&&Math.abs(ll.lng-lng)<0.0005) m.openPopup();
   });
   renderList();
 }
 
-// ── Analytics ──────────────────────────────────────────────────────────────────
-function renderAnalytics() {
-  const el = document.getElementById('analytics-body');
-  if (allVeiculos.length === 0) return;
-
-  const crit = allVeiculos.filter(v => v.categoria === 'crit').length;
-  const med  = allVeiculos.filter(v => v.categoria === 'med').length;
-  const rec  = allVeiculos.filter(v => v.categoria === 'rec').length;
-  const withCov = allVeiculos.filter(v => v.hasCoverage).length;
-
-  const maxDias = Math.max(...allVeiculos.map(v => v.diasOffline));
-  const avgDias = Math.round(allVeiculos.reduce((s, v) => s + v.diasOffline, 0) / allVeiculos.length);
-
-  // Top municipios from ERBs
-  const byMun = {};
-  allERBs.forEach(e => { if (e.mun) byMun[e.mun] = (byMun[e.mun] || 0) + 1; });
-  const topMun = Object.entries(byMun).sort((a,b) => b[1]-a[1]).slice(0, 6);
-  const maxMun = topMun[0]?.[1] || 1;
-
-  const byOp = {};
-  allERBs.forEach(e => { if (e.op) byOp[e.op] = (byOp[e.op] || 0) + 1; });
-  const topOp = Object.entries(byOp).sort((a,b) => b[1]-a[1]).slice(0, 8);
-  const maxOp = topOp[0]?.[1] || 1;
-
-  el.innerHTML = `
+// ─── Analytics ────────────────────────────────────────────────────────────────
+function renderAnalytics(){
+  const el=document.getElementById('abody');
+  if(!allV.length&&!allERBs.length) return;
+  const crit=allV.filter(v=>v.cat==='crit').length;
+  const med =allV.filter(v=>v.cat==='med').length;
+  const rec =allV.filter(v=>v.cat==='rec').length;
+  const wc  =allV.filter(v=>v.cov).length;
+  const avgD=allV.length?Math.round(allV.reduce((s,v)=>s+v.dias,0)/allV.length):0;
+  const maxD=allV.length?Math.max(...allV.map(v=>v.dias)):0;
+  const byOp={};
+  allERBs.forEach(e=>{if(e.op) byOp[e.op]=(byOp[e.op]||0)+1;});
+  const topOp=Object.entries(byOp).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxOp=topOp[0]?.[1]||1;
+  const byMun={};
+  allERBs.forEach(e=>{if(e.mun) byMun[e.mun]=(byMun[e.mun]||0)+1;});
+  const topMun=Object.entries(byMun).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxMun=topMun[0]?.[1]||1;
+  el.innerHTML=`
+    ${allV.length?`
     <div class="mcard">
       <div class="mtitle">Frota Offline</div>
-      <div class="mval">${allVeiculos.length}</div>
-      <div class="msub">Máx: ${maxDias}d · Média: ${avgDias}d · Com cobertura: ${withCov}</div>
+      <div class="mval">${allV.length}</div>
+      <div class="msub">Máx: ${maxD}d · Média: ${avgD}d · ${wc} com cobertura</div>
     </div>
     <div class="mcard">
       <div class="mtitle">Por Criticidade</div>
-      <div class="bar-item"><div class="bar-lbl">Crítico</div><div class="bar-out"><div class="bar-in" style="width:${(crit/allVeiculos.length*100).toFixed(0)}%;background:#ef4444"></div></div><div class="bar-n">${crit}</div></div>
-      <div class="bar-item"><div class="bar-lbl">Médio</div><div class="bar-out"><div class="bar-in" style="width:${(med/allVeiculos.length*100).toFixed(0)}%;background:#f59e0b"></div></div><div class="bar-n">${med}</div></div>
-      <div class="bar-item"><div class="bar-lbl">Recente</div><div class="bar-out"><div class="bar-in" style="width:${(rec/allVeiculos.length*100).toFixed(0)}%;background:#3b82f6"></div></div><div class="bar-n">${rec}</div></div>
+      <div class="bitem"><div class="blbl">Crítico</div><div class="bout"><div class="bin" style="width:${allV.length?(crit/allV.length*100).toFixed(0):0}%;background:#ef4444"></div></div><div class="bn">${crit}</div></div>
+      <div class="bitem"><div class="blbl">Médio</div><div class="bout"><div class="bin" style="width:${allV.length?(med/allV.length*100).toFixed(0):0}%;background:#f59e0b"></div></div><div class="bn">${med}</div></div>
+      <div class="bitem"><div class="blbl">Recente</div><div class="bout"><div class="bin" style="width:${allV.length?(rec/allV.length*100).toFixed(0):0}%;background:#3b82f6"></div></div><div class="bn">${rec}</div></div>
+    </div>`:''}
+    ${allERBs.length?`
+    <div class="mcard">
+      <div class="mtitle">ERBs por Operadora (${allERBs.length.toLocaleString('pt-BR')})</div>
+      ${topOp.map(([op,n])=>`<div class="bitem"><div class="blbl">${op||'—'}</div><div class="bout"><div class="bin" style="width:${(n/maxOp*100).toFixed(0)}%;background:${opColor(op)}"></div></div><div class="bn">${n>999?Math.round(n/1000)+'k':n}</div></div>`).join('')}
     </div>
     <div class="mcard">
-      <div class="mtitle">ERBs por Operadora (${allERBs.length} total)</div>
-      ${topOp.map(([op, n]) => `<div class="bar-item"><div class="bar-lbl">${op||'—'}</div><div class="bar-out"><div class="bar-in" style="width:${(n/maxOp*100).toFixed(0)}%"></div></div><div class="bar-n">${n}</div></div>`).join('')}
-    </div>
-    <div class="mcard">
-      <div class="mtitle">ERBs por Município</div>
-      ${topMun.map(([m, n]) => `<div class="bar-item"><div class="bar-lbl">${m||'—'}</div><div class="bar-out"><div class="bar-in" style="width:${(n/maxMun*100).toFixed(0)}%;background:linear-gradient(90deg,#8b5cf6,#3b82f6)"></div></div><div class="bar-n">${n}</div></div>`).join('')}
-    </div>`;
+      <div class="mtitle">ERBs por Município (Top)</div>
+      ${topMun.map(([m,n])=>`<div class="bitem"><div class="blbl">${m||'—'}</div><div class="bout"><div class="bin" style="width:${(n/maxMun*100).toFixed(0)}%;background:linear-gradient(90deg,#8b5cf6,#3b82f6)"></div></div><div class="bn">${n}</div></div>`).join('')}
+    </div>`:''}`;
 }
 
-// ── Chip handlers ──────────────────────────────────────────────────────────────
-function chipOp(el) {
-  document.querySelectorAll('#chips-op .chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  filterOp = el.dataset.val;
-  applyFilters();
+// ─── Chips ────────────────────────────────────────────────────────────────────
+function pickOp(el){
+  document.querySelectorAll('#chips-op .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); fOp=el.dataset.v; applyFilters();
+}
+function pickTec(el){
+  document.querySelectorAll('#chips-tec .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); fTec=el.dataset.v; applyFilters();
+}
+function pickDias(el,v){
+  document.querySelectorAll('[id^="df-"]').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); fDias=v; applyFilters();
 }
 
-function chipTec(el) {
-  document.querySelectorAll('#chips-tec .chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  filterTec = el.dataset.val;
-  applyFilters();
-}
-
-function setDiasFiltro(v) {
-  filterDias = v;
-  ['all','rec','med','crit'].forEach(k => {
-    const el = document.getElementById('df-' + k);
-    if (el) el.classList.toggle('active', (k === 'all' && !v) || k === v);
-  });
-  applyFilters();
-}
-
-document.getElementById('f-placa').addEventListener('input', e => {
-  filterPlaca = e.target.value;
-  applyFilters();
-});
-
-// ── Radius & view ──────────────────────────────────────────────────────────────
-function updateRadius() {
-  radiusKm = parseInt(document.getElementById('radius-sl').value);
-  document.getElementById('radius-v').textContent = radiusKm;
-  // Recompute coverage
-  allVeiculos.forEach(v => {
-    v.nearERBs = allERBs.filter(e => haversine(v.lat, v.lng, e.lat, e.lng) <= radiusKm);
-    v.hasCoverage = v.nearERBs.length > 0;
-  });
-  applyFilters();
-}
-
-function setView(m) {
-  viewMode = m;
-  document.querySelectorAll('.vbtn').forEach(b => b.classList.remove('active'));
-  document.getElementById('vm-' + m).classList.add('active');
+// ─── View / Raio ──────────────────────────────────────────────────────────────
+function setView(m){
+  viewMode=m;
+  document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('vm-'+m).classList.add('active');
   renderVehicles();
 }
-
-function toggleERBs(on) {
-  erbVisible = on;
-  document.getElementById('erb-on').classList.toggle('active', on);
-  document.getElementById('erb-off').classList.toggle('active', !on);
+function updateRadius(){
+  radiusKm=parseInt(document.getElementById('rsl').value);
+  document.getElementById('rv').textContent=radiusKm;
+  if(allERBs.length) recalcCoverage();
+  applyFilters();
+}
+function toggleERBs(on){
+  erbVisible=on;
+  document.getElementById('erb-on').classList.toggle('active',on);
+  document.getElementById('erb-off').classList.toggle('active',!on);
   renderERBLayer();
 }
+function goTab(n){
+  ['filters','list','analytics'].forEach((t,i)=>{
+    document.querySelectorAll('.sbtab')[i].classList.toggle('active',t===n);
+    document.getElementById('tab-'+t).classList.toggle('active',t===n);
+  });
+  if(n==='analytics') renderAnalytics();
+}
 
-// ── Export ─────────────────────────────────────────────────────────────────────
-function exportCSV() {
-  if (!filteredV.length) { toast('Nenhum dado para exportar'); return; }
-  const rows = [['Placa','Latitude','Longitude','Data Parou','Dias Offline','Criticidade','Tem Cobertura','ERBs no Raio']];
-  filteredV.forEach(v => rows.push([
-    v.placa, v.lat.toFixed(6), v.lng.toFixed(6), v.dataParou, v.diasOffline,
-    v.categoria, v.hasCoverage ? 'Sim' : 'Não', v.nearERBs.length
-  ]));
-  const csv = rows.map(r => r.map(x => `"${x}"`).join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'frota-offline.csv';
-  a.click();
+// ─── Export ───────────────────────────────────────────────────────────────────
+function exportCSV(){
+  if(!filtV.length){toast('Sem dados');return;}
+  const rows=[['Placa','Latitude','Longitude','Data Parou','Dias Offline','Criticidade','Tem Cobertura','ERBs no Raio']];
+  filtV.forEach(v=>{
+    const nr=v.nearF||v.near; const hc=v.covF!==undefined?v.covF:v.cov;
+    rows.push([v.placa,v.lat.toFixed(6),v.lng.toFixed(6),v.dataStr,v.dias,v.cat,hc?'Sim':'Não',nr.length]);
+  });
+  const csv=rows.map(r=>r.map(x=>`"${x}"`).join(',')).join('\n');
+  dl(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),'frota-offline.csv');
   toast('📥 CSV exportado!');
 }
-
-function exportKML() {
-  if (!filteredV.length) { toast('Nenhum dado para exportar'); return; }
-  const placemarks = filteredV.map(v => `
-  <Placemark>
-    <name>${v.placa}</name>
-    <description>Dias offline: ${v.diasOffline} | Parou: ${v.dataParou} | Cobertura: ${v.hasCoverage ? 'Sim' : 'Não'}</description>
-    <Point><coordinates>${v.lng.toFixed(6)},${v.lat.toFixed(6)},0</coordinates></Point>
-  </Placemark>`).join('');
-  const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Frota Offline</name>${placemarks}</Document></kml>`;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }));
-  a.download = 'frota-offline.kml';
-  a.click();
+function exportKML(){
+  if(!filtV.length){toast('Sem dados');return;}
+  const pm=filtV.map(v=>`<Placemark><name>${v.placa}</name><description>Dias: ${v.dias} | ${v.dataStr}</description><Point><coordinates>${v.lng.toFixed(6)},${v.lat.toFixed(6)},0</coordinates></Point></Placemark>`).join('');
+  const kml=`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Frota Offline</name>${pm}</Document></kml>`;
+  dl(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}),'frota-offline.kml');
   toast('🗺️ KML exportado!');
 }
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
 
-// ── Tab ────────────────────────────────────────────────────────────────────────
-function tab(name) {
-  const names = ['filters','list','analytics'];
-  document.querySelectorAll('.sb-tab').forEach((t, i) => t.classList.toggle('active', names[i] === name));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'analytics') renderAnalytics();
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function haversine(la1,lo1,la2,lo2){
+  const R=6371,dL=(la2-la1)*Math.PI/180,dG=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dG/2)**2;
+  return R*2*Math.asin(Math.sqrt(a));
 }
-
-// ── Utils ──────────────────────────────────────────────────────────────────────
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dL = (lat2 - lat1) * Math.PI / 180;
-  const dG = (lng2 - lng1) * Math.PI / 180;
-  const a  = Math.sin(dL/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dG/2)**2;
-  return R * 2 * Math.asin(Math.sqrt(a));
-}
-
-function parseCoord(raw) {
-  if (!raw) return NaN;
-  let s = String(raw).trim().replace(',', '.');
-  let n = parseFloat(s);
-  if (isNaN(n)) return NaN;
-  if (Math.abs(n) > 90) {
-    for (let i = 1; i <= 4; i++) {
-      const t = n / Math.pow(10, i);
-      if (Math.abs(t) <= 90) { n = t; break; }
-    }
+function parseCoord(raw){
+  if(!raw) return NaN;
+  let s=String(raw).trim().replace(',','.');
+  let n=parseFloat(s);
+  if(isNaN(n)) return NaN;
+  if(Math.abs(n)>90){
+    for(let i=1;i<=4;i++){const t=n/Math.pow(10,i);if(Math.abs(t)<=90){n=t;break;}}
   }
   return n;
 }
-
-function setStatus(msg) { document.getElementById('import-status').textContent = msg; }
-
+function setSt(m){document.getElementById('st').textContent=m;}
+function setOvMsg(m){document.getElementById('ov-msg').textContent=m;}
+function setOvPct(m){document.getElementById('ov-pct').textContent=m;}
+function showOv(msg){
+  const el=document.getElementById('ov');
+  el.classList.remove('hide');
+  setOvMsg(msg);
+}
+function hideOv(){document.getElementById('ov').classList.add('hide');}
+function setProgress(pct){
+  document.getElementById('erb-progress-bar').style.width=pct+'%';
+}
 let _tt;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(_tt);
-  _tt = setTimeout(() => el.classList.remove('show'), 3500);
+function toast(m){
+  const el=document.getElementById('toast');
+  el.textContent=m; el.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),3500);
 }
 
 initMap();
