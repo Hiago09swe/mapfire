@@ -1,659 +1,1255 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>Monitor de Calor – Frota</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #f1f5f9;
-            --side: #ffffff;
-            --border: #e2e8f0;
-            --accent: #0ea5e9;
-            --warn: #f59e0b;
-            --danger: #ef4444;
-            --text: #0f172a;
-            --muted: #64748b;
-        }
-        body { display: flex; height: 100vh; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        #sidebar { width: 310px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 8px rgba(0,0,0,0.07); }
-        .header { padding: 16px 20px; background: #0f172a; }
-        .header h1 { font-size: 0.95rem; color: #38bdf8; letter-spacing: 2px; font-weight: 700; }
-        .header .subtitle { font-size: 0.68rem; color: #64748b; margin-top: 3px; letter-spacing: 1px; }
-        #statusBar { padding: 8px 16px; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; flex-shrink: 0; }
-        .dot.error { background: var(--danger); animation: none; }
-        .dot.ok { background: #22c55e; animation: none; }
-        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
-        #statusText { font-size: 0.72rem; color: var(--muted); }
-        #stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
-        .stat { background: #fff; padding: 10px 8px; text-align: center; }
-        .stat .val { font-size: 1.2rem; font-weight: 800; }
-        .stat .lbl { font-size: 0.62rem; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat .val.blue { color: var(--accent); }
-        .stat .val.yellow { color: var(--warn); }
-        .stat .val.red { color: var(--danger); }
-        #searchBox { padding: 10px 14px; background: #f8fafc; border: none; border-bottom: 1px solid var(--border); color: var(--text); width: 100%; font-size: 0.8rem; outline: none; }
-        #searchBox::placeholder { color: #94a3b8; }
-        .list { overflow-y: auto; flex: 1; }
-        .list::-webkit-scrollbar { width: 4px; }
-        .list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        .card { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 10px; }
-        .card:hover { background: #f0f9ff; }
-        .card.ativo { background: #e0f2fe; border-left: 3px solid #0ea5e9; }
-        .card-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .card-info { flex: 1; min-width: 0; }
-        .card b { font-size: 0.84rem; color: #0f172a; display: block; }
-        .card span { font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-        .card-dias { font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 99px; flex-shrink: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Monitor de Calor — Frota Offline</title>
 
-        /* Ícone de cobertura no card */
-        .card-cobertura { font-size: 0.65rem; flex-shrink: 0; }
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 
-        /* Painel lateral de detalhe */
-        #painel { display: none; position: absolute; bottom: 0; left: 310px; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 12px 12px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.12); z-index: 2000; padding: 0; max-height: 70vh; overflow-y: auto; }
-        #painel-header { background: #0f172a; border-radius: 12px 12px 0 0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
-        #painel-placa { font-size: 1rem; font-weight: 800; color: #fff; }
-        #painel-fechar { background: none; border: none; color: #64748b; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
-        #painel-fechar:hover { color: #fff; }
-        #painel-body { padding: 14px 16px; }
-        .painel-row { font-size: 0.78rem; color: #475569; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-        .painel-row b { color: #0f172a; }
-        .painel-secao { font-size: 0.65rem; font-weight: 700; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 6px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
-        .erb-tec { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; margin: 2px; }
-        .erb-grid { display: flex; flex-wrap: wrap; margin-bottom: 6px; }
-        .erb-operadora { font-size: 0.7rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; margin: 2px 0; color: #334155; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-        .erb-loading { font-size: 0.75rem; color: #94a3b8; font-style: italic; }
-        .erb-nenhuma { font-size: 0.75rem; color: #ef4444; font-weight: 600; }
-        .erb-ok { font-size: 0.75rem; color: #22c55e; font-weight: 600; }
+<style>
+:root {
+  --bg: #06090f;
+  --surface: #0d1117;
+  --panel: #111820;
+  --border: #1c2635;
+  --border2: #243040;
+  --accent: #e85d04;
+  --accent2: #faa307;
+  --blue: #3b82f6;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --purple: #8b5cf6;
+  --text: #d1d5db;
+  --text2: #9ca3af;
+  --muted: #4b5563;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Manrope', sans-serif;
+  --r: 8px;
+}
 
-        /* Badge de cobertura */
-        .badge-cobertura { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; margin-bottom: 8px; }
-        .badge-sim { background: #dcfce7; color: #16a34a; }
-        .badge-nao { background: #fee2e2; color: #dc2626; }
+*{box-sizing:border-box;margin:0;padding:0}
 
-        #map { flex: 1; }
-        #legend { position: absolute; bottom: 30px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.95); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
-        #legend h4 { color: #0f172a; margin-bottom: 8px; font-size: 0.68rem; letter-spacing: 1px; text-transform: uppercase; }
-        .leg-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: #475569; }
-        .leg-color { width: 28px; height: 6px; border-radius: 3px; }
-        #retryBtn { display: none; margin: 8px 16px; padding: 7px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
-        #retryBtn:hover { opacity: 0.85; }
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
 
-        /* Debug painel */
-        #debugInfo { position: absolute; top: 10px; right: 10px; z-index: 9999; background: rgba(15,23,42,0.9); color: #94a3b8; font-size: 0.65rem; padding: 8px 12px; border-radius: 8px; max-width: 300px; display: none; }
+/* ── HEADER ── */
+header{
+  height:48px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:20px;
+  flex-shrink:0;
+  z-index:1100;
+}
 
-        .leaflet-popup-content-wrapper { border-radius: 10px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
-    </style>
+.logo{
+  font-family:var(--mono);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:2px;
+  color:var(--accent);
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.logo em{color:var(--text2);font-style:normal}
+
+.header-pills{
+  display:flex;
+  gap:6px;
+  margin-left:auto;
+  align-items:center;
+}
+
+.pill{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 10px;
+  border-radius:20px;
+  border:1px solid var(--border2);
+  background:var(--panel);
+  font-size:11px;
+  color:var(--text2);
+  font-family:var(--mono);
+  white-space:nowrap;
+}
+.pill strong{color:var(--text);font-size:13px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ── IMPORT BAR ── */
+#import-bar{
+  background:var(--surface);
+  border-bottom:1px solid var(--accent);
+  padding:6px 14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+  flex-wrap:wrap;
+}
+
+#import-bar label.lbl{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--accent);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+
+#csv-url{
+  flex:1;
+  min-width:260px;
+  background:rgba(232,93,4,.07);
+  border:1px solid rgba(232,93,4,.4);
+  border-radius:var(--r);
+  color:var(--text);
+  padding:5px 10px;
+  font-size:11px;
+  font-family:var(--mono);
+  outline:none;
+}
+#csv-url::placeholder{color:var(--muted)}
+#csv-url:focus{border-color:var(--accent)}
+
+.btn{
+  padding:5px 12px;
+  border-radius:var(--r);
+  font-size:11px;
+  font-weight:700;
+  font-family:var(--mono);
+  cursor:pointer;
+  border:none;
+  transition:opacity .2s;
+  letter-spacing:.5px;
+  white-space:nowrap;
+}
+.btn:hover{opacity:.82}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--panel);border:1px solid var(--border2);color:var(--text2)}
+#csv-file{display:none}
+#import-status{font-size:10px;font-family:var(--mono);color:var(--green)}
+
+/* ── LAYOUT ── */
+.layout{
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:300px;
+  flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.sb-tabs{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sb-tab{
+  flex:1;
+  padding:9px 2px;
+  text-align:center;
+  font-size:9px;
+  font-family:var(--mono);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--muted);
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all .2s;
+}
+.sb-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.tab-pane{display:none;flex:1;overflow:hidden;flex-direction:column}
+.tab-pane.active{display:flex}
+
+/* Filters */
+.filters{
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  overflow-y:auto;
+  flex:1;
+}
+.filters::-webkit-scrollbar{width:3px}
+.filters::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.flabel{
+  font-size:9px;
+  font-family:var(--mono);
+  letter-spacing:1.2px;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:5px;
+}
+
+.finput{
+  width:100%;
+  background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:var(--r);
+  color:var(--text);
+  padding:6px 10px;
+  font-size:11px;
+  font-family:var(--sans);
+  outline:none;
+  transition:border-color .2s;
+}
+.finput:focus{border-color:var(--accent)}
+.finput::placeholder{color:var(--muted)}
+
+/* Chip filters */
+.chip-group{display:flex;flex-wrap:wrap;gap:4px}
+.chip{
+  padding:3px 9px;
+  border-radius:20px;
+  border:1px solid var(--border2);
+  background:var(--panel);
+  color:var(--text2);
+  font-size:10px;
+  font-family:var(--mono);
+  cursor:pointer;
+  transition:all .18s;
+  letter-spacing:.4px;
+}
+.chip:hover{border-color:var(--accent2);color:var(--accent2)}
+.chip.active{background:rgba(232,93,4,.15);border-color:var(--accent);color:var(--accent)}
+.chip.tec-chip.active{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue)}
+
+/* Slider */
+.slider-row{display:flex;align-items:center;gap:8px}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  flex:1;height:3px;background:var(--border2);border-radius:3px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--accent);cursor:pointer;
+  box-shadow:0 0 6px rgba(232,93,4,.5);
+}
+.range-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);width:52px;text-align:right;white-space:nowrap}
+
+/* View mode */
+.view-btns{display:flex;gap:4px}
+.vbtn{
+  flex:1;padding:5px;border-radius:6px;
+  border:1px solid var(--border2);background:var(--panel);
+  color:var(--muted);font-size:9px;font-family:var(--mono);
+  letter-spacing:.8px;text-transform:uppercase;cursor:pointer;
+  transition:all .18s;text-align:center;
+}
+.vbtn.active{background:rgba(232,93,4,.12);border-color:var(--accent);color:var(--accent)}
+
+/* Bottom counter */
+.sb-footer{
+  padding:10px 12px;
+  border-top:1px solid var(--border);
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.counter-big{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--accent)}
+.counter-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+
+/* List */
+.list-header{
+  padding:8px 12px 6px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.list-header .sub{font-size:10px;font-family:var(--mono);color:var(--accent);margin-top:2px}
+
+.vlist{flex:1;overflow-y:auto;padding:6px}
+.vlist::-webkit-scrollbar{width:3px}
+.vlist::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.vcard{
+  background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:var(--r);
+  padding:9px 11px;
+  margin-bottom:5px;
+  cursor:pointer;
+  transition:all .18s;
+  position:relative;
+}
+.vcard:hover{border-color:var(--accent);box-shadow:0 0 8px rgba(232,93,4,.1)}
+.vcard.sel{border-color:var(--accent);background:rgba(232,93,4,.06)}
+
+.vcard-placa{
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:2px;
+}
+.vcard-meta{font-size:10px;color:var(--text2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+.badge-dias{
+  position:absolute;top:9px;right:9px;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:4px;
+}
+.badge-dias.crit{background:rgba(239,68,68,.18);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.badge-dias.med{background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+.badge-dias.rec{background:rgba(59,130,246,.18);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
+
+/* Analytics */
+.analytics-body{flex:1;overflow-y:auto;padding:12px}
+.analytics-body::-webkit-scrollbar{width:3px}
+.analytics-body::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.mcard{
+  background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:var(--r);
+  padding:11px;
+  margin-bottom:8px;
+}
+.mtitle{font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:7px}
+.mval{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent)}
+.msub{font-size:10px;color:var(--muted);margin-top:3px}
+
+.bar-item{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.bar-lbl{font-size:10px;color:var(--text);width:70px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+.bar-out{flex:1;height:10px;background:var(--border);border-radius:4px;overflow:hidden}
+.bar-in{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease}
+.bar-n{font-size:10px;color:var(--accent);font-family:var(--mono);width:24px;text-align:right;flex-shrink:0}
+
+.export-row{
+  display:flex;gap:6px;padding:8px 12px;
+  border-top:1px solid var(--border);flex-shrink:0;
+}
+.btn-exp{
+  flex:1;padding:6px;border-radius:var(--r);
+  border:1px solid var(--accent2);background:rgba(250,163,7,.07);
+  color:var(--accent2);font-size:10px;font-family:var(--mono);
+  letter-spacing:.5px;text-transform:uppercase;cursor:pointer;
+  transition:all .18s;
+}
+.btn-exp:hover{background:rgba(250,163,7,.15)}
+
+/* ── MAP AREA ── */
+.map-area{position:relative;flex:1;display:flex}
+#map{flex:1;z-index:1}
+
+/* Legend */
+.legend{
+  position:absolute;bottom:28px;right:10px;
+  background:rgba(13,17,23,.92);
+  border:1px solid var(--border2);
+  border-radius:var(--r);
+  padding:8px 12px;
+  z-index:500;
+  font-size:10px;
+  color:var(--text2);
+  pointer-events:none;
+  font-family:var(--mono);
+  letter-spacing:.5px;
+}
+.leg-title{color:var(--text);font-weight:700;margin-bottom:6px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase}
+.leg-item{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.leg-sep{border-top:1px solid var(--border);margin:5px 0}
+
+/* ERB info bar */
+.erb-bar{
+  position:absolute;top:10px;right:10px;
+  background:rgba(13,17,23,.92);
+  border:1px solid var(--border2);
+  border-radius:var(--r);
+  padding:8px 12px;
+  z-index:500;
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--text2);
+  max-width:200px;
+  letter-spacing:.4px;
+}
+.erb-bar .etitle{color:var(--blue);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:5px}
+
+/* Popup */
+.leaflet-popup-content-wrapper{
+  background:var(--surface) !important;
+  color:var(--text) !important;
+  border:1px solid var(--border2) !important;
+  border-radius:12px !important;
+  box-shadow:0 8px 32px rgba(0,0,0,.6) !important;
+  padding:0 !important;
+}
+.leaflet-popup-content{margin:0 !important;min-width:260px;max-width:300px}
+.leaflet-popup-tip{background:var(--surface) !important}
+.leaflet-popup-close-button{color:var(--muted) !important;font-size:16px !important;top:8px !important;right:10px !important}
+
+.popup-inner{padding:14px}
+.popup-placa{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:1px}
+.popup-badge{display:inline-block;padding:2px 9px;border-radius:4px;font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:8px}
+.popup-row{font-size:11px;color:var(--text2);margin-bottom:3px;display:flex;gap:5px;align-items:flex-start}
+.popup-coord{background:var(--panel);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;font-family:var(--mono);font-size:10px;color:var(--accent);margin:5px 0}
+.popup-div{border-top:1px solid var(--border);margin:8px 0}
+.popup-sec{font-size:9px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.popup-erbs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px}
+.erb-chip{padding:2px 7px;border-radius:3px;font-size:9px;font-family:var(--mono);font-weight:700}
+.erb-chip.ok{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#10b981}
+.erb-chip.no{background:rgba(100,116,139,.1);border:1px solid var(--border2);color:var(--muted)}
+.popup-ops{display:flex;flex-direction:column;gap:3px}
+.op-row{font-size:10px;display:flex;justify-content:space-between;align-items:center}
+.op-name{color:var(--text2)}
+.op-tecs{display:flex;gap:2px}
+.tec-tag{padding:1px 5px;border-radius:3px;font-size:8px;font-family:var(--mono);font-weight:700}
+.tec-2g{background:rgba(59,130,246,.15);color:#93c5fd}
+.tec-3g{background:rgba(16,185,129,.15);color:#6ee7b7}
+.tec-4g{background:rgba(250,163,7,.15);color:#fcd34d}
+.tec-5g{background:rgba(139,92,246,.15);color:#c4b5fd}
+
+/* Loading */
+#overlay{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:9999;transition:opacity .5s;
+}
+#overlay.hide{opacity:0;pointer-events:none}
+.ring{
+  width:44px;height:44px;
+  border:2px solid var(--border2);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+  margin-bottom:12px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ring-text{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:20px;left:50%;
+  transform:translateX(-50%) translateY(70px);
+  background:var(--panel);border:1px solid var(--accent);
+  border-radius:30px;padding:7px 18px;
+  font-size:11px;font-family:var(--mono);color:var(--accent);
+  z-index:99999;transition:transform .3s;white-space:nowrap;
+  box-shadow:0 4px 20px rgba(232,93,4,.2);
+}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ERB toggle */
+.erb-toggle{
+  position:absolute;top:10px;left:10px;z-index:600;
+  display:flex;gap:4px;
+  background:rgba(13,17,23,.92);
+  border:1px solid var(--border2);
+  border-radius:var(--r);
+  padding:5px;
+}
+.erbtn{
+  padding:4px 10px;border-radius:5px;
+  border:1px solid transparent;
+  background:transparent;color:var(--muted);
+  font-size:9px;font-family:var(--mono);
+  letter-spacing:.8px;text-transform:uppercase;
+  cursor:pointer;transition:all .18s;
+}
+.erbtn.active{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue)}
+
+@media(max-width:768px){
+  .sidebar{width:260px}
+  .header-pills{display:none}
+}
+</style>
 </head>
 <body>
 
-<div id="sidebar">
-    <div class="header">
-        <h1>🔥 MONITOR DE CALOR</h1>
-        <div class="subtitle">FROTA OFFLINE · COBERTURA DE REDE</div>
-    </div>
-    <div id="statusBar">
-        <div class="dot" id="dot"></div>
-        <span id="statusText">Carregando dados...</span>
-    </div>
-    <button id="retryBtn" onclick="carregar()">↻ Tentar novamente</button>
-    <div id="stats">
-        <div class="stat"><div class="val blue" id="sTotal">—</div><div class="lbl">Total</div></div>
-        <div class="stat"><div class="val yellow" id="sMedio">—</div><div class="lbl">2–7 dias</div></div>
-        <div class="stat"><div class="val red" id="sCritico">—</div><div class="lbl">&gt;7 dias</div></div>
-    </div>
-    <input id="searchBox" type="text" placeholder="🔍  Buscar placa ou município..." oninput="filtrarLista(this.value)">
-    <div class="list" id="unit-list">
-        <div style="padding:30px;text-align:center;color:#94a3b8;font-size:0.8rem">Aguardando dados...</div>
-    </div>
+<div id="overlay">
+  <div class="ring"></div>
+  <div class="ring-text">Inicializando</div>
 </div>
 
-<div id="map"></div>
+<div id="toast"></div>
 
-<div id="painel">
-    <div id="painel-header">
-        <span id="painel-placa">—</span>
-        <button id="painel-fechar" onclick="fecharPainel()">✕</button>
-    </div>
-    <div id="painel-body">
-        <div class="erb-loading">Clique em um veículo para ver detalhes</div>
-    </div>
+<header>
+  <div class="logo">🔥 Monitor <em>de</em> Calor — <em>Frota Offline</em></div>
+  <div class="header-pills">
+    <div class="pill"><span class="dot" style="background:var(--accent)"></span><strong id="h-total">0</strong>&nbsp;veículos</div>
+    <div class="pill"><span class="dot" style="background:var(--yellow)"></span><strong id="h-med">0</strong>&nbsp;2–7 dias</div>
+    <div class="pill"><span class="dot" style="background:var(--red)"></span><strong id="h-crit">0</strong>&nbsp;&gt;7 dias</div>
+    <div class="pill"><span class="dot" style="background:var(--blue)"></span><strong id="h-erbs">0</strong>&nbsp;ERBs</div>
+  </div>
+</header>
+
+<div id="import-bar">
+  <label class="lbl">📡 Frota (CSV):</label>
+  <input id="csv-url" type="text" placeholder="URL do Google Sheets publicado como CSV ou deixe vazio para demo…"/>
+  <button class="btn btn-accent" onclick="loadURL()">↓ Carregar</button>
+  <label class="btn btn-ghost" for="csv-file">📂 Upload</label>
+  <input id="csv-file" type="file" accept=".csv" onchange="loadFile(event)"/>
+  <span id="import-status"></span>
 </div>
 
-<div id="legend">
-    <h4>Dias offline</h4>
-    <div class="leg-item"><div class="leg-color" style="background:#0ea5e9"></div> Recente (≤2 dias)</div>
-    <div class="leg-item"><div class="leg-color" style="background:#f59e0b"></div> Médio (2–7 dias)</div>
-    <div class="leg-item"><div class="leg-color" style="background:#ef4444"></div> Crítico (&gt;7 dias)</div>
-    <div style="border-top:1px solid #e2e8f0;margin-top:8px;padding-top:8px;">
-        <div class="leg-item"><div style="width:12px;height:12px;border-radius:50%;background:#22c55e;flex-shrink:0"></div> Com cobertura</div>
-        <div class="leg-item"><div style="width:12px;height:12px;border-radius:50%;background:#6b7280;flex-shrink:0"></div> Sem cobertura</div>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-tabs">
+      <div class="sb-tab active" onclick="tab('filters')">Filtros</div>
+      <div class="sb-tab" onclick="tab('list')">Lista</div>
+      <div class="sb-tab" onclick="tab('analytics')">Stats</div>
     </div>
-    <div style="border-top:1px solid #e2e8f0;margin-top:8px;padding-top:8px;font-size:0.7rem;color:#94a3b8">
-        Clique no veículo para detalhar cobertura
+
+    <!-- FILTROS -->
+    <div class="tab-pane active" id="tab-filters">
+      <div class="filters">
+
+        <div>
+          <div class="flabel">🚗 Placa</div>
+          <input class="finput" id="f-placa" placeholder="Buscar placa…" oninput="applyFilters()"/>
+        </div>
+
+        <div>
+          <div class="flabel">📡 Operadora</div>
+          <div class="chip-group" id="chips-op">
+            <div class="chip active" data-val="" onclick="chipOp(this)">Todas</div>
+            <div class="chip" data-val="ALGAR" onclick="chipOp(this)">ALGAR</div>
+            <div class="chip" data-val="BRISANET" onclick="chipOp(this)">BRISANET</div>
+            <div class="chip" data-val="CLARO" onclick="chipOp(this)">CLARO</div>
+            <div class="chip" data-val="SERCOMTEL" onclick="chipOp(this)">SERCOMTEL</div>
+            <div class="chip" data-val="TIM" onclick="chipOp(this)">TIM</div>
+            <div class="chip" data-val="UNIFIQUE" onclick="chipOp(this)">UNIFIQUE</div>
+            <div class="chip" data-val="VIVO" onclick="chipOp(this)">VIVO</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flabel">📶 Tecnologia ERB</div>
+          <div class="chip-group" id="chips-tec">
+            <div class="chip tec-chip active" data-val="" onclick="chipTec(this)">Todas</div>
+            <div class="chip tec-chip" data-val="2G" onclick="chipTec(this)">2G</div>
+            <div class="chip tec-chip" data-val="3G" onclick="chipTec(this)">3G</div>
+            <div class="chip tec-chip" data-val="4G" onclick="chipTec(this)">4G</div>
+            <div class="chip tec-chip" data-val="5G" onclick="chipTec(this)">5G</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flabel">📅 Dias Offline</div>
+          <div class="chip-group">
+            <div class="chip active" id="df-all" onclick="setDiasFiltro('')">Todos</div>
+            <div class="chip" id="df-rec" onclick="setDiasFiltro('rec')">≤2 dias</div>
+            <div class="chip" id="df-med" onclick="setDiasFiltro('med')">2–7 dias</div>
+            <div class="chip" id="df-crit" onclick="setDiasFiltro('crit')">&gt;7 dias</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flabel">📏 Raio de Busca (ERBs)</div>
+          <div class="slider-row">
+            <input type="range" id="radius-sl" min="1" max="100" value="20" step="1" oninput="updateRadius()"/>
+            <span class="range-val"><span id="radius-v">20</span> km</span>
+          </div>
+        </div>
+
+        <div>
+          <div class="flabel">🗺️ Visualização</div>
+          <div class="view-btns">
+            <button class="vbtn active" id="vm-pins" onclick="setView('pins')">Pins</button>
+            <button class="vbtn" id="vm-heat" onclick="setView('heat')">Calor</button>
+            <button class="vbtn" id="vm-both" onclick="setView('both')">Ambos</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="sb-footer">
+        <div>
+          <div class="flabel">Veículos Offline</div>
+          <div class="counter-big" id="cnt-main">—</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div class="flabel" style="margin-bottom:3px">Com cobertura</div>
+          <div style="font-family:var(--mono);font-size:14px;color:var(--green)" id="cnt-cov">—</div>
+          <div class="flabel" style="margin-top:4px;margin-bottom:3px">Sem cobertura</div>
+          <div style="font-family:var(--mono);font-size:14px;color:var(--muted)" id="cnt-nocov">—</div>
+        </div>
+      </div>
     </div>
+
+    <!-- LISTA -->
+    <div class="tab-pane" id="tab-list">
+      <div class="list-header">
+        <div class="flabel">Ordenado por dias offline</div>
+        <div class="sub" id="list-sub">—</div>
+      </div>
+      <div class="vlist" id="vlist">
+        <div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">Carregue os dados para ver a lista.</div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="tab-pane" id="tab-analytics">
+      <div class="analytics-body" id="analytics-body">
+        <div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">Carregue os dados para ver as estatísticas.</div>
+      </div>
+      <div class="export-row">
+        <button class="btn-exp" onclick="exportCSV()">📥 CSV</button>
+        <button class="btn-exp" onclick="exportKML()">🗺️ KML</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-area">
+    <div id="map"></div>
+
+    <!-- ERB layer toggle -->
+    <div class="erb-toggle">
+      <button class="erbtn active" id="erb-on" onclick="toggleERBs(true)">ERBs On</button>
+      <button class="erbtn" id="erb-off" onclick="toggleERBs(false)">ERBs Off</button>
+    </div>
+
+    <!-- ERB info -->
+    <div class="erb-bar" id="erb-bar" style="display:none">
+      <div class="etitle">Cobertura no Ponto</div>
+      <div id="erb-bar-content" style="font-size:10px;color:var(--text2)">Clique em um veículo</div>
+    </div>
+
+    <div class="legend">
+      <div class="leg-title">Dias Offline</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#3b82f6"></div> Recente (≤2 dias)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div> Médio (2–7 dias)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div> Crítico (&gt;7 dias)</div>
+      <div class="leg-sep"></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#10b981"></div> Com cobertura</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#4b5563"></div> Sem cobertura</div>
+    </div>
+  </div>
 </div>
 
-<div id="debugInfo"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ═══════════════════════════════════════════════════
-// CONFIGURAÇÃO
-// ═══════════════════════════════════════════════════
-const SHEET_FROTA = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpX2je4AsPF0tcKl67A_FEprw0uugaZ_CvejLFc4SUqXcnyM-63uZj_QC9bqz_LUrX-_OV1kRvsDgu/pub?gid=0&single=true&output=csv';
-const SHEET_ERBS  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRu56ZgpZtvvtSJ6-Ia-MzWOY7BhSC-SowleKQCn8Wrhejh5YqcSMhnoC1Ex8HV44b-vTrL-einOXXD/pub?gid=0&single=true&output=csv';
+// ── ERB URL publicado ─────────────────────────────────────────────────────────
+const ERB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRh4-Zi5a-Bmkasie4JUSePKNimtGcasgvRTa2uBn-wIhSEAMha3-jYeaz6Tx6L3VBfjjG3jU1Cstnd/pub?output=csv';
 
-const PROXIES = [
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-];
+// ── State ──────────────────────────────────────────────────────────────────────
+let allVeiculos = [];
+let allERBs     = [];
+let filteredV   = [];
+let markers     = [];
+let erbMarkers  = [];
+let heatLayer   = null;
+let viewMode    = 'pins';
+let erbVisible  = true;
+let selectedId  = null;
+let radiusKm    = 20;
+let map;
 
-// ═══════════════════════════════════════════════════
-// ESTADO GLOBAL
-// ═══════════════════════════════════════════════════
-let todosVeiculos   = [];
-let marcadores      = [];
-let cardAtivo       = null;
-let erbsPorMunicipio = {}; // normalizado -> { total, tecs: Set, operadoras: {} }
-let geocodeCache    = {};  // "lat,lng" -> nome do municipio
-let erbsCarregadas  = false;
-let debugLog        = [];
+let filterOp   = '';
+let filterTec  = '';
+let filterDias = '';
+let filterPlaca = '';
 
-// ═══════════════════════════════════════════════════
-// MAPA
-// ═══════════════════════════════════════════════════
-const map = L.map('map', { zoomControl: true }).setView([-15.8, -48.0], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 19
-}).addTo(map);
+// ── Map init ───────────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', { center: [-15, -52], zoom: 5 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', {
+    attribution: '©OpenStreetMap ©CARTO', subdomains: 'abcd', maxZoom: 19
+  }).addTo(map);
 
-// ═══════════════════════════════════════════════════
-// UTILITÁRIOS
-// ═══════════════════════════════════════════════════
-
-/** Remove acentos, coloca em maiúsculo e trim */
-function normalizar(str) {
-    return (str || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toUpperCase()
-        .trim();
+  setTimeout(() => document.getElementById('overlay').classList.add('hide'), 700);
+  loadERBs();
 }
 
-function setStatus(msg, state) {
-    document.getElementById('statusText').textContent = msg;
-    const dot = document.getElementById('dot');
-    dot.className = 'dot ' + (state || '');
-    document.getElementById('retryBtn').style.display = state === 'error' ? 'block' : 'none';
+// ── Load ERBs ─────────────────────────────────────────────────────────────────
+function loadERBs() {
+  setStatus('⏳ Carregando ERBs…');
+  Papa.parse(ERB_URL, {
+    download: true, header: true, skipEmptyLines: true,
+    complete: r => {
+      allERBs = processERBs(r.data);
+      document.getElementById('h-erbs').textContent = allERBs.length;
+      setStatus(`✅ ${allERBs.length} ERBs + aguardando frota`);
+      renderERBLayer();
+      toast(`📡 ${allERBs.length} ERBs carregadas`);
+    },
+    error: () => setStatus('⚠️ ERBs indisponíveis')
+  });
 }
 
-function log(msg) {
-    console.log(msg);
-    debugLog.push(msg);
+function processERBs(rows) {
+  const result = [];
+  rows.forEach((r, i) => {
+    const keys = Object.keys(r);
+    // Flexible column detection
+    const get = (names) => {
+      for (const n of names) {
+        const k = keys.find(k => k.trim().toUpperCase().replace(/[^A-Z0-9]/g,'').includes(n));
+        if (k && r[k]) return r[k].toString().trim();
+      }
+      return '';
+    };
+
+    let lat = parseCoord(get(['LATITUDE','LAT']));
+    let lng = parseCoord(get(['LONGITUDE','LONG','LON','LNG']));
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+    if (lat > 15 || lat < -35) return;
+    if (lng > -30 || lng < -75) return;
+
+    const op   = get(['OPERADORA','OPERATOR','OPER']);
+    const uf   = get(['SIGLAUF','UF','ESTADO','STATE']);
+    const mun  = get(['MUN','MUNICIPIO','CIDADE','CITY']);
+    const tecs = get(['TECS','TECNOLOGIA','TECH']);
+    const faixa = get(['FAIXA','FREQUENCIA','FREQ']);
+    const classe = get(['CLASSINFRA','CLASSE','TYPE']);
+    const ibge  = get(['IBGE','COD']);
+
+    // Parse technologies
+    const tecList = [];
+    if (tecs.includes('2G') || tecs.includes('2g')) tecList.push('2G');
+    if (tecs.includes('3G') || tecs.includes('3g')) tecList.push('3G');
+    if (tecs.includes('4G') || tecs.includes('4g')) tecList.push('4G');
+    if (tecs.includes('5G') || tecs.includes('5g')) tecList.push('5G');
+
+    result.push({ id: i, lat, lng, op, uf, mun, tecs, faixa, classe, ibge, tecList });
+  });
+  return result;
 }
 
-async function fetchComProxy(sheetUrl) {
-    for (let i = 0; i < PROXIES.length; i++) {
-        try {
-            setStatus(`Carregando (proxy ${i+1}/3)...`, '');
-            const res = await fetch(PROXIES[i](sheetUrl), { cache: 'no-cache' });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const text = await res.text();
-            if (text && text.length > 50) {
-                log(`Proxy ${i+1} OK, ${text.length} bytes`);
-                return text;
-            }
-        } catch(e) { log(`Proxy ${i+1} falhou: ${e.message}`); }
-    }
-    return null;
-}
+function renderERBLayer() {
+  erbMarkers.forEach(m => m.remove());
+  erbMarkers = [];
+  if (!erbVisible) return;
 
-function parseCSV(text) {
-    const lines = text.trim().split(/\r?\n/);
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toUpperCase());
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const vals = [];
-        let cur = '', inQ = false;
-        for (const ch of lines[i]) {
-            if (ch === '"') { inQ = !inQ; }
-            else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
-            else { cur += ch; }
-        }
-        vals.push(cur.trim());
-        const obj = {};
-        headers.forEach((h, idx) => { obj[h] = (vals[idx] || '').replace(/^"|"$/g, '').trim(); });
-        rows.push(obj);
-    }
-    return rows;
-}
+  const ops = new Set(allERBs.map(e => e.op).filter(Boolean));
+  const opColors = {
+    'VIVO': '#8b5cf6', 'CLARO': '#ef4444', 'TIM': '#3b82f6',
+    'OI': '#f59e0b', 'ALGAR': '#10b981', 'BRISANET': '#ec4899',
+    'SERCOMTEL': '#06b6d4', 'UNIFIQUE': '#84cc16'
+  };
 
-function parseDateBR(raw) {
-    if (!raw) return null;
-    const partes = raw.trim().split(' ')[0].split('/');
-    if (partes.length === 3) {
-        const d = new Date(+partes[2], +partes[1]-1, +partes[0]);
-        if (!isNaN(d)) return d;
-    }
-    const d = new Date(raw);
-    return isNaN(d) ? null : d;
-}
+  const subset = filterOp
+    ? allERBs.filter(e => e.op && e.op.toUpperCase().includes(filterOp.toUpperCase()))
+    : allERBs;
 
-function corPorDias(dias) {
-    if (dias > 7)  return { cor: '#ef4444', badge: '#ef4444' };
-    if (dias > 2)  return { cor: '#f59e0b', badge: '#f59e0b' };
-    return { cor: '#0ea5e9', badge: '#0ea5e9' };
-}
+  const filtered = filterTec
+    ? subset.filter(e => e.tecList && e.tecList.includes(filterTec))
+    : subset;
 
-// ═══════════════════════════════════════════════════
-// GEOCODING REVERSO (Nominatim)
-// ═══════════════════════════════════════════════════
-async function getMunicipioPorCoord(lat, lng) {
-    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-    if (geocodeCache[key] !== undefined) return geocodeCache[key];
-    try {
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=pt`;
-        const res = await fetch(url, { headers: { 'User-Agent': 'MonitorCalorFrota/1.0' } });
-        const data = await res.json();
-        const mun = data?.address?.city
-                 || data?.address?.town
-                 || data?.address?.village
-                 || data?.address?.municipality
-                 || '';
-        geocodeCache[key] = mun;
-        log(`Geocode [${lat.toFixed(4)},${lng.toFixed(4)}] → "${mun}"`);
-        return mun;
-    } catch(e) {
-        geocodeCache[key] = '';
-        return '';
-    }
-}
-
-// ═══════════════════════════════════════════════════
-// CARREGA ERBs
-// Agrupa: municipio_normalizado → { total, tecs: Set, operadoras: { nome → { tecs: Set, total, classifs: Set } } }
-// ═══════════════════════════════════════════════════
-async function carregarERBs() {
-    log('--- Carregando ERBs ---');
-    const csv = await fetchComProxy(SHEET_ERBS);
-    if (!csv) {
-        log('ERRO: ERBs não carregadas');
-        erbsCarregadas = false;
-        return;
-    }
-
-    const rows = parseCSV(csv);
-    log(`ERBs CSV: ${rows.length} linhas. Colunas: ${Object.keys(rows[0] || {}).join(', ')}`);
-
-    erbsPorMunicipio = {};
-
-    rows.forEach(row => {
-        // Tenta vários nomes possíveis para a coluna de município
-        const munRaw = row['MUN'] || row['MUNICIPIO'] || row['MUNICÍPIO'] || row['CIDADE'] || row['CITY'] || '';
-        const mun = normalizar(munRaw);
-
-        // Tecnologias: pode ser coluna TECS separada por espaço ou vírgula
-        const tecsRaw = row['TECS'] || row['TEC'] || row['TECNOLOGIA'] || row['TECNOLOGIAS'] || '';
-        const tecs = tecsRaw
-            .split(/[\s,;/|]+/)
-            .map(t => t.trim().toUpperCase())
-            .filter(t => t && /^[2345]G$/.test(t)); // aceita somente 2G/3G/4G/5G
-
-        const op      = (row['OPERADORA'] || row['OPERATOR'] || row['EMPRESA'] || '').trim();
-        const classif = (row['CLASSINFRAFISICA'] || row['CLASSINFRA'] || row['CLASS'] || '').trim();
-
-        if (!mun) return; // pula linhas sem município
-
-        if (!erbsPorMunicipio[mun]) {
-            erbsPorMunicipio[mun] = { total: 0, tecs: new Set(), operadoras: {} };
-        }
-        erbsPorMunicipio[mun].total++;
-        tecs.forEach(t => erbsPorMunicipio[mun].tecs.add(t));
-
-        if (op) {
-            if (!erbsPorMunicipio[mun].operadoras[op]) {
-                erbsPorMunicipio[mun].operadoras[op] = { tecs: new Set(), total: 0, classifs: new Set() };
-            }
-            erbsPorMunicipio[mun].operadoras[op].total++;
-            tecs.forEach(t => erbsPorMunicipio[mun].operadoras[op].tecs.add(t));
-            if (classif) erbsPorMunicipio[mun].operadoras[op].classifs.add(classif);
-        }
+  filtered.forEach(e => {
+    const color = opColors[e.op?.toUpperCase()] || '#4b5563';
+    const icon = L.divIcon({
+      html: `<div style="width:6px;height:6px;border-radius:50%;background:${color};opacity:.7;border:1px solid rgba(255,255,255,.2)"></div>`,
+      className: '', iconSize: [6, 6], iconAnchor: [3, 3]
     });
-
-    const totalMunicipios = Object.keys(erbsPorMunicipio).length;
-    log(`ERBs processadas: ${totalMunicipios} municípios únicos`);
-    log(`Exemplos: ${Object.keys(erbsPorMunicipio).slice(0, 8).join(', ')}`);
-
-    // Mostra amostra das tecnologias encontradas para debug
-    const amostra = Object.entries(erbsPorMunicipio).slice(0, 3);
-    amostra.forEach(([mun, info]) => {
-        log(`  ${mun}: ${info.total} ERBs | tecs: [${[...info.tecs].join(',')}] | ops: ${Object.keys(info.operadoras).join(', ')}`);
-    });
-
-    erbsCarregadas = totalMunicipios > 0;
+    const m = L.marker([e.lat, e.lng], { icon, zIndexOffset: 50 }).addTo(map);
+    m.bindPopup(`
+      <div class="popup-inner" style="min-width:180px">
+        <div class="popup-placa" style="font-size:12px">${e.op || '—'}</div>
+        <div class="popup-row">📍 ${e.mun || '—'}/${e.uf || '—'}</div>
+        <div class="popup-row">📶 ${e.tecs || '—'}</div>
+        <div class="popup-row">🏗️ ${e.classe || '—'}</div>
+        ${e.faixa ? `<div class="popup-row">📻 ${e.faixa}</div>` : ''}
+      </div>`, { maxWidth: 220 });
+    erbMarkers.push(m);
+  });
 }
 
-// ═══════════════════════════════════════════════════
-// BUSCA INFO DO MUNICÍPIO (com fallback de busca parcial)
-// ═══════════════════════════════════════════════════
-function getInfoMunicipio(municipio) {
-    if (!municipio) return null;
-    const chave = normalizar(municipio);
-
-    // 1. Busca exata
-    if (erbsPorMunicipio[chave]) return erbsPorMunicipio[chave];
-
-    // 2. Busca parcial: nome do município está contido na chave ou vice-versa
-    // Isso resolve "Goiania" vs "Goiania - GO" etc.
-    const chaves = Object.keys(erbsPorMunicipio);
-    for (const k of chaves) {
-        if (k.includes(chave) || chave.includes(k)) {
-            log(`Match parcial: "${chave}" → "${k}"`);
-            return erbsPorMunicipio[k];
-        }
-    }
-
-    log(`Município "${chave}" NÃO encontrado nas ERBs`);
-    return null;
+// ── Load frota CSV ─────────────────────────────────────────────────────────────
+function loadURL() {
+  const url = document.getElementById('csv-url').value.trim();
+  if (!url) { toast('Cole a URL do CSV!'); return; }
+  setStatus('⏳ Carregando frota…');
+  Papa.parse(url, {
+    download: true, header: true, skipEmptyLines: true,
+    complete: r => processVeiculos(r.data),
+    error: e => setStatus('❌ ' + e.message)
+  });
 }
 
-function temCobertura(municipio) {
-    return getInfoMunicipio(municipio) !== null;
+function loadFile(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  setStatus('⏳ Lendo…');
+  Papa.parse(f, {
+    header: true, skipEmptyLines: true,
+    complete: r => processVeiculos(r.data),
+    error: e => setStatus('❌ ' + e.message)
+  });
 }
 
-// ═══════════════════════════════════════════════════
-// PAINEL DE DETALHE
-// ═══════════════════════════════════════════════════
-function fecharPainel() {
-    document.getElementById('painel').style.display = 'none';
-    if (cardAtivo) { cardAtivo.classList.remove('ativo'); cardAtivo = null; }
-}
+function processVeiculos(rows) {
+  allVeiculos = [];
+  const now = new Date();
 
-async function abrirPainel(v, cardEl) {
-    const painel = document.getElementById('painel');
-    const { cor } = corPorDias(v.dias);
+  rows.forEach((r, i) => {
+    const keys = Object.keys(r);
+    const get = (names) => {
+      for (const n of names) {
+        const k = keys.find(k => {
+          const kc = k.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+          return names.some(n2 => kc.includes(n2.replace(/[^A-Z0-9]/g,'')));
+        });
+        if (k && r[k]) return r[k].toString().trim();
+      }
+      // Also try by column position
+      const vals = Object.values(r);
+      return '';
+    };
 
-    if (cardAtivo) cardAtivo.classList.remove('ativo');
-    if (cardEl) { cardEl.classList.add('ativo'); cardAtivo = cardEl; }
+    // Try by header name OR position (A=LAT, B=LONG, C=PLACA, D=DATA)
+    const colNames = keys;
+    const getByPos = (pos) => colNames[pos] ? (r[colNames[pos]] || '').toString().trim() : '';
 
-    document.getElementById('painel-placa').textContent = v.placa;
-    document.getElementById('painel-body').innerHTML = `
-        <div class="painel-row">⏱ Offline há <b style="color:${cor}">&nbsp;${v.dias} dia${v.dias !== 1 ? 's' : ''}</b></div>
-        <div class="painel-secao">📡 Cobertura de Rede</div>
-        <div class="erb-loading">Buscando município…</div>
-    `;
-    painel.style.display = 'block';
-    map.flyTo([v.lat, v.lng], 13, { duration: 1 });
+    // Detect header style
+    const firstKey = (keys[0]||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const isPositional = firstKey === 'LAT' || firstKey === 'A' || /^-?\d/.test(Object.values(r)[0] || '');
 
-    // Resolve município: usa o da planilha ou faz geocoding
-    let municipio = v.municipio || '';
-    if (!municipio) {
-        municipio = await getMunicipioPorCoord(v.lat, v.lng);
-        v.municipio = municipio;
-        // Atualiza o card na lista
-        const idx = todosVeiculos.indexOf(v);
-        const span = document.querySelector('#card-' + idx + ' .card-info span');
-        if (span && municipio) span.textContent = municipio;
-    }
+    let latRaw, lngRaw, placa, dataRaw;
 
-    const info = getInfoMunicipio(municipio);
-    const corTec = { '5G': '#7c3aed', '4G': '#0ea5e9', '3G': '#10b981', '2G': '#64748b' };
-    let cobHTML = '';
-
-    if (!municipio) {
-        cobHTML = `<div class="badge-cobertura badge-nao">⚠ Município não identificado</div>`;
-
-    } else if (!info) {
-        cobHTML = `
-            <div class="painel-row">📍 <b>${municipio}</b></div>
-            <div class="badge-cobertura badge-nao">✕ Sem ERBs cadastradas neste município</div>
-            ${!erbsCarregadas ? '<div style="font-size:0.7rem;color:#f59e0b;margin-top:4px">⚠ Planilha de ERBs pode não ter carregado corretamente</div>' : ''}
-        `;
+    if (isPositional || firstKey === 'LAT') {
+      latRaw  = getByPos(0);
+      lngRaw  = getByPos(1);
+      placa   = getByPos(2);
+      dataRaw = getByPos(3);
     } else {
-        const tecsGlobal = [...info.tecs].sort();
-        const badgesTec = tecsGlobal.length > 0
-            ? tecsGlobal.map(t => {
-                const c = corTec[t] || '#64748b';
-                return `<span class="erb-tec" style="background:${c}20;color:${c};border:1px solid ${c}55">${t}</span>`;
-              }).join('')
-            : '<span style="font-size:0.72rem;color:#94a3b8">Tecnologia não informada</span>';
-
-        let opRows = '';
-        const ops = Object.entries(info.operadoras).sort();
-        if (ops.length > 0) {
-            ops.forEach(([op, dados]) => {
-                const tecOp = [...dados.tecs].sort().map(t => {
-                    const c = corTec[t] || '#64748b';
-                    return `<span style="font-size:0.65rem;font-weight:700;color:${c};background:${c}18;border-radius:4px;padding:1px 5px;margin-right:2px">${t}</span>`;
-                }).join('');
-                const classifStr = dados.classifs.size
-                    ? `<span style="font-size:0.62rem;color:#94a3b8">(${[...dados.classifs].join(', ')})</span>`
-                    : '';
-                opRows += `<div class="erb-operadora">
-                    <span style="font-weight:600;color:#0f172a;font-size:0.72rem">${op}</span>
-                    <span>${tecOp} ${classifStr}</span>
-                    <span style="font-size:0.62rem;color:#94a3b8">${dados.total} ERB${dados.total !== 1 ? 's' : ''}</span>
-                </div>`;
-            });
-        } else {
-            opRows = `<div style="font-size:0.72rem;color:#94a3b8">Operadoras não informadas</div>`;
-        }
-
-        cobHTML = `
-            <div class="painel-row">📍 <b>${municipio}</b> &mdash; <span style="color:#64748b">${info.total} ERB${info.total !== 1 ? 's' : ''} no total</span></div>
-            <div class="badge-cobertura badge-sim">✓ Cobertura confirmada</div>
-            <div style="margin:4px 0 8px"><span class="erb-grid">${badgesTec}</span></div>
-            <div class="painel-secao">Por Operadora</div>
-            <div>${opRows}</div>
-        `;
+      latRaw  = r[keys.find(k => /lat/i.test(k))] || getByPos(0);
+      lngRaw  = r[keys.find(k => /lon|lng/i.test(k))] || getByPos(1);
+      placa   = r[keys.find(k => /placa|plate/i.test(k))] || getByPos(2);
+      dataRaw = r[keys.find(k => /parou|data|stopped|date/i.test(k))] || getByPos(3);
     }
 
-    document.getElementById('painel-body').innerHTML = `
-        <div class="painel-row">⏱ Offline há <b style="color:${cor}">&nbsp;${v.dias} dia${v.dias !== 1 ? 's' : ''}</b></div>
-        <div class="painel-row">🗺 ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}</div>
-        <div class="painel-secao">📡 Cobertura de Rede</div>
-        ${cobHTML}
-    `;
-}
+    let lat = parseCoord(latRaw);
+    let lng = parseCoord(lngRaw);
 
-// ═══════════════════════════════════════════════════
-// LISTA LATERAL
-// ═══════════════════════════════════════════════════
-function renderLista(veiculos) {
-    const el = document.getElementById('unit-list');
-    if (!veiculos.length) {
-        el.innerHTML = '<div style="padding:30px;text-align:center;color:#94a3b8;font-size:0.8rem">Nenhum veículo encontrado.</div>';
-        return;
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+    if (lat > 15 || lat < -35) { if (lat < 15 && lat > -15 && lng > -75 && lng < -30) {} else return; }
+    if (lng > -25 || lng < -75) return;
+
+    // Parse date
+    let diasOffline = 0;
+    let dataStr = (dataRaw || '').trim();
+    if (dataStr) {
+      // Try multiple formats: DD/MM/YYYY, DD/MM/YY, MM/DD/YYYY, ISO
+      let d = null;
+      const patterns = [
+        // DD/MM/YYYY HH:MM or DD/MM/YY
+        /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/,
+      ];
+      const m = dataStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+      if (m) {
+        let year = parseInt(m[3]);
+        if (year < 100) year += 2000;
+        // Assume DD/MM
+        d = new Date(year, parseInt(m[2]) - 1, parseInt(m[1]));
+      } else {
+        d = new Date(dataStr);
+      }
+      if (d && !isNaN(d.getTime())) {
+        diasOffline = Math.round((now - d) / (1000 * 60 * 60 * 24));
+        if (diasOffline < 0) diasOffline = 0;
+      }
     }
-    el.innerHTML = veiculos.map(v => {
-        const { cor, badge } = corPorDias(v.dias);
-        const idx = todosVeiculos.indexOf(v);
-        const cob = temCobertura(v.municipio);
-        const cobIcon = v.municipio
-            ? (cob ? '<span title="Com cobertura" style="color:#22c55e">●</span>' : '<span title="Sem cobertura" style="color:#9ca3af">○</span>')
-            : '';
-        return `<div class="card" id="card-${idx}" onclick="clicarCard(${idx})">
-            <div class="card-dot" style="background:${cor};box-shadow:0 0 6px ${cor}88"></div>
-            <div class="card-info">
-                <b>${v.placa}</b>
-                <span>${v.municipio || 'Clique para ver localização'}</span>
-            </div>
-            <span class="card-cobertura">${cobIcon}</span>
-            <div class="card-dias" style="background:${badge}22;color:${badge}">${v.dias}d</div>
-        </div>`;
-    }).join('');
-}
 
-function filtrarLista(q) {
-    const qu = q.toUpperCase();
-    renderLista(todosVeiculos.filter(v =>
-        v.placa.toUpperCase().includes(qu) || (v.municipio || '').toUpperCase().includes(qu)
-    ));
-}
+    const categoria = diasOffline <= 2 ? 'rec' : diasOffline <= 7 ? 'med' : 'crit';
 
-function clicarCard(idx) {
-    const v = todosVeiculos[idx];
-    if (!v) return;
-    abrirPainel(v, document.getElementById('card-' + idx));
-}
+    // Check ERB coverage
+    const nearERBs = allERBs.filter(e => haversine(lat, lng, e.lat, e.lng) <= radiusKm);
+    const hasCoverage = nearERBs.length > 0;
 
-// ═══════════════════════════════════════════════════
-// MAPA – marcadores coloridos + anel de cobertura
-// ═══════════════════════════════════════════════════
-function limparMarcadores() {
-    marcadores.forEach(m => map.removeLayer(m));
-    marcadores = [];
-}
-
-function renderMapa(veiculos) {
-    limparMarcadores();
-    veiculos.forEach(v => {
-        const { cor } = corPorDias(v.dias);
-        const raio = v.dias > 7 ? 14000 : v.dias > 2 ? 9000 : 5500;
-        const idx  = todosVeiculos.indexOf(v);
-
-        // Anel externo (halo)
-        const halo = L.circle([v.lat, v.lng], {
-            radius: raio * 1.7, color: 'transparent', fillColor: cor, fillOpacity: 0.06
-        }).addTo(map);
-
-        // Círculo principal colorido por dias offline
-        const circ = L.circle([v.lat, v.lng], {
-            radius: raio, color: cor, weight: 1.5, opacity: 0.75, fillColor: cor, fillOpacity: 0.22
-        }).addTo(map);
-
-        // Indicador de cobertura: anel interno verde ou cinza
-        const corCob = temCobertura(v.municipio) ? '#22c55e' : '#9ca3af';
-        const marcadorCentro = L.circleMarker([v.lat, v.lng], {
-            radius: 6,
-            color: corCob,
-            weight: 2,
-            fillColor: corCob,
-            fillOpacity: 0.9
-        }).addTo(map);
-
-        // Popup informativo
-        const popupHTML = `
-            <div style="min-width:160px">
-                <div style="font-size:1rem;font-weight:800;color:#0f172a">${v.placa}</div>
-                <div style="font-size:0.78rem;color:#475569;margin-top:4px">Offline: <b style="color:${cor}">${v.dias}d</b></div>
-                ${v.municipio ? `<div style="font-size:0.75rem;color:#475569;margin-top:2px">📍 ${v.municipio}</div>` : ''}
-                <div style="font-size:0.75rem;margin-top:4px">
-                    ${temCobertura(v.municipio)
-                        ? `<span style="color:#16a34a;font-weight:700">✓ Com cobertura</span>`
-                        : `<span style="color:#dc2626;font-weight:700">✕ Sem cobertura cadastrada</span>`
-                    }
-                </div>
-                <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">Clique para detalhes completos</div>
-            </div>
-        `;
-        marcadorCentro.bindPopup(popupHTML);
-
-        // Clique no círculo ou marcador → abre painel lateral
-        const onClickVeiculo = () => abrirPainel(v, document.getElementById('card-' + idx));
-        circ.on('click', onClickVeiculo);
-        marcadorCentro.on('click', onClickVeiculo);
-
-        marcadores.push(halo, circ, marcadorCentro);
+    allVeiculos.push({
+      id: i, lat, lng,
+      placa: placa || `VH-${i+1}`,
+      dataParou: dataStr,
+      diasOffline, categoria, hasCoverage, nearERBs
     });
+  });
+
+  // Update headers
+  const crit = allVeiculos.filter(v => v.categoria === 'crit').length;
+  const med  = allVeiculos.filter(v => v.categoria === 'med').length;
+  document.getElementById('h-total').textContent = allVeiculos.length;
+  document.getElementById('h-crit').textContent  = crit;
+  document.getElementById('h-med').textContent   = med;
+
+  setStatus(`✅ ${allVeiculos.length} veículos carregados`);
+  toast(`🚗 ${allVeiculos.length} veículos offline carregados`);
+
+  applyFilters();
+  renderAnalytics();
 }
 
-// ═══════════════════════════════════════════════════
-// CARREGAMENTO PRINCIPAL
-// ═══════════════════════════════════════════════════
-async function carregar() {
-    debugLog = [];
-    log('=== Início do carregamento ===');
-
-    // 1. Carrega ERBs primeiro
-    setStatus('Carregando ERBs...', '');
-    await carregarERBs();
-
-    // 2. Carrega frota
-    setStatus('Carregando frota...', '');
-    const csv = await fetchComProxy(SHEET_FROTA);
-    if (!csv || csv.length < 50) {
-        setStatus('Falha ao carregar. Verifique a planilha.', 'error');
-        return;
+// ── Filters ────────────────────────────────────────────────────────────────────
+function applyFilters() {
+  filteredV = allVeiculos.filter(v => {
+    if (filterPlaca && !v.placa.toLowerCase().includes(filterPlaca.toLowerCase())) return false;
+    if (filterDias === 'rec'  && v.categoria !== 'rec')  return false;
+    if (filterDias === 'med'  && v.categoria !== 'med')  return false;
+    if (filterDias === 'crit' && v.categoria !== 'crit') return false;
+    // Op & Tec filter: recheck ERBs
+    if (filterOp || filterTec) {
+      const nearFiltered = v.nearERBs.filter(e => {
+        if (filterOp  && !(e.op||'').toUpperCase().includes(filterOp.toUpperCase()))  return false;
+        if (filterTec && !e.tecList.includes(filterTec)) return false;
+        return true;
+      });
+      // Still show vehicle but update coverage
+      v.hasCoverageFiltered = nearFiltered.length > 0;
+      v.nearERBsFiltered = nearFiltered;
+    } else {
+      v.hasCoverageFiltered = v.hasCoverage;
+      v.nearERBsFiltered = v.nearERBs;
     }
+    return true;
+  });
 
-    const rows = parseCSV(csv);
-    log(`Frota CSV: ${rows.length} linhas. Colunas: ${Object.keys(rows[0] || {}).join(', ')}`);
+  filteredV.sort((a, b) => b.diasOffline - a.diasOffline);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const withCov    = filteredV.filter(v => v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage).length;
+  const withoutCov = filteredV.length - withCov;
 
-    todosVeiculos = rows.reduce((acc, item) => {
-        const lat   = parseFloat((item['LAT']  || '').replace(',', '.'));
-        const lng   = parseFloat((item['LONG'] || item['LNG'] || item['LON'] || '').replace(',', '.'));
-        const placa = item['PLACA'] || '';
-        if (isNaN(lat) || isNaN(lng) || !placa) return acc;
+  document.getElementById('cnt-main').textContent  = filteredV.length;
+  document.getElementById('cnt-cov').textContent   = withCov;
+  document.getElementById('cnt-nocov').textContent = withoutCov;
+  document.getElementById('list-sub').textContent  = `${filteredV.length} veículos — ${withCov} com cobertura`;
 
-        const dataFim = parseDateBR(item['PAROU DE COMUNICAR'] || item['DATA'] || '');
-        const dias    = dataFim ? Math.max(0, Math.floor((today - dataFim) / 86400000)) : 0;
-
-        // Município: tenta múltiplas colunas
-        const municipio = (
-            item['MUNICIPIO'] || item['MUNICÍPIO'] || item['MUN'] ||
-            item['CIDADE'] || item['CITY'] || ''
-        ).trim();
-
-        acc.push({ lat, lng, placa, dias, municipio });
-        return acc;
-    }, []).sort((a, b) => b.dias - a.dias);
-
-    // Estatísticas
-    const critico = todosVeiculos.filter(v => v.dias > 7).length;
-    const medio   = todosVeiculos.filter(v => v.dias > 2 && v.dias <= 7).length;
-    document.getElementById('sTotal').textContent   = todosVeiculos.length;
-    document.getElementById('sMedio').textContent   = medio;
-    document.getElementById('sCritico').textContent = critico;
-
-    // Verifica quantos veículos têm município informado e com cobertura
-    const comMunicipio = todosVeiculos.filter(v => v.municipio).length;
-    const comCobertura = todosVeiculos.filter(v => temCobertura(v.municipio)).length;
-    log(`Veículos com município: ${comMunicipio}/${todosVeiculos.length}`);
-    log(`Veículos com cobertura: ${comCobertura}/${todosVeiculos.length}`);
-
-    renderLista(todosVeiculos);
-    renderMapa(todosVeiculos);
-
-    if (todosVeiculos.length > 0) {
-        map.fitBounds(
-            L.latLngBounds(todosVeiculos.map(v => [v.lat, v.lng])),
-            { padding: [40, 40] }
-        );
-    }
-
-    const totalMunic = Object.keys(erbsPorMunicipio).length;
-    const statusMsg = `${todosVeiculos.length} veículos · ${totalMunic} municípios com ERBs · ${comCobertura} com cobertura`;
-    setStatus(statusMsg, 'ok');
-    log(`=== Carregamento concluído: ${statusMsg} ===`);
-
-    // Se NENHUM veículo tem cobertura mas ERBs carregaram, mostra aviso de debug
-    if (erbsCarregadas && comCobertura === 0 && comMunicipio > 0) {
-        log('⚠ ATENÇÃO: ERBs carregadas mas nenhum match encontrado!');
-        log('Exemplos de municípios na frota: ' + todosVeiculos.slice(0,5).map(v => `"${normalizar(v.municipio)}"`).join(', '));
-        log('Exemplos de chaves ERBs: ' + Object.keys(erbsPorMunicipio).slice(0,5).join(', '));
-
-        // Mostra painel de debug no mapa
-        const dbg = document.getElementById('debugInfo');
-        dbg.style.display = 'block';
-        dbg.innerHTML = `<b style="color:#f59e0b">⚠ Debug: 0 matches de município</b><br>
-            Frota: ${todosVeiculos.slice(0,3).map(v => normalizar(v.municipio)).join(' | ')}<br>
-            ERBs: ${Object.keys(erbsPorMunicipio).slice(0,3).join(' | ')}<br>
-            <small>Verifique se os nomes batem</small>`;
-    }
+  renderVehicles();
+  renderList();
+  renderERBLayer();
 }
 
-carregar();
-setInterval(carregar, 60000);
+// ── Map render ─────────────────────────────────────────────────────────────────
+function renderVehicles() {
+  markers.forEach(m => m.remove());
+  markers = [];
+  if (heatLayer) { heatLayer.remove(); heatLayer = null; }
+
+  if (filteredV.length === 0) return;
+
+  const catColor = { rec: '#3b82f6', med: '#f59e0b', crit: '#ef4444' };
+
+  if (viewMode === 'heat' || viewMode === 'both') {
+    const pts = filteredV.map(v => [v.lat, v.lng, v.diasOffline > 30 ? 1 : v.diasOffline / 30]);
+    heatLayer = L.heatLayer(pts, {
+      radius: 28, blur: 18, maxZoom: 17,
+      gradient: { 0.2: '#3b82f6', 0.5: '#f59e0b', 0.8: '#ef4444', 1.0: '#7f1d1d' }
+    }).addTo(map);
+  }
+
+  if (viewMode === 'pins' || viewMode === 'both') {
+    filteredV.forEach(v => {
+      const col  = catColor[v.categoria];
+      const cov  = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
+      const size = v.categoria === 'crit' ? 22 : 18;
+
+      const icon = L.divIcon({
+        html: `<div style="
+          width:${size}px;height:${size}px;border-radius:50%;
+          background:${col};border:2px solid ${cov ? '#10b981' : 'rgba(255,255,255,.15)'};
+          box-shadow:0 0 ${v.categoria === 'crit' ? 10 : 5}px ${col}88;
+          display:flex;align-items:center;justify-content:center;
+          font-size:${size*.45}px;
+        ">🚗</div>`,
+        className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
+      });
+
+      const m = L.marker([v.lat, v.lng], { icon, zIndexOffset: v.diasOffline }).addTo(map);
+      m.bindPopup(buildPopup(v), { maxWidth: 310 });
+      m.on('click', () => { selectedId = v.id; showERBBar(v); });
+      markers.push(m);
+    });
+  }
+}
+
+function buildPopup(v) {
+  const cat = { rec: 'rec', med: 'med', crit: 'crit' }[v.categoria];
+  const catLabel = { rec: '≤2 DIAS', med: '2–7 DIAS', crit: `${v.diasOffline} DIAS` }[v.categoria];
+  const catBg = { rec: 'rgba(59,130,246,.18)', med: 'rgba(245,158,11,.18)', crit: 'rgba(239,68,68,.18)' }[v.categoria];
+  const catColor = { rec: '#93c5fd', med: '#fcd34d', crit: '#fca5a5' }[v.categoria];
+
+  const nearERBs = v.nearERBsFiltered || v.nearERBs;
+  const hasCov   = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
+
+  // Group by operator
+  const byOp = {};
+  nearERBs.slice(0, 30).forEach(e => {
+    if (!byOp[e.op]) byOp[e.op] = { tecs: new Set(), count: 0 };
+    byOp[e.op].count++;
+    e.tecList.forEach(t => byOp[e.op].tecs.add(t));
+  });
+
+  const opHtml = Object.entries(byOp).slice(0, 6).map(([op, d]) => `
+    <div class="op-row">
+      <span class="op-name">${op || '—'}</span>
+      <div class="op-tecs">
+        ${[...d.tecs].map(t => `<span class="tec-tag tec-${t.toLowerCase()}">${t}</span>`).join('')}
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="popup-inner">
+      <div class="popup-placa">${v.placa}</div>
+      <span class="popup-badge" style="background:${catBg};color:${catColor};border:1px solid ${catColor}44">
+        ⏱ ${catLabel} OFFLINE
+      </span>
+      <div class="popup-row">📅 Parou: ${v.dataParou || '—'}</div>
+      <div class="popup-coord">📍 ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}</div>
+      <div class="popup-div"></div>
+      <div class="popup-sec">Cobertura de Rede (${radiusKm}km)</div>
+      <div class="popup-erbs">
+        ${hasCov
+          ? `<span class="erb-chip ok">✓ Cobertura confirmada</span>`
+          : `<span class="erb-chip no">✗ Sem cobertura</span>`}
+        <span class="erb-chip ok" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#93c5fd">${nearERBs.length} ERBs no raio</span>
+      </div>
+      ${nearERBs.length > 0 ? `
+        <div class="popup-sec" style="margin-top:6px">Por Operadora</div>
+        <div class="popup-ops">${opHtml}</div>` : ''}
+    </div>`;
+}
+
+function showERBBar(v) {
+  const bar = document.getElementById('erb-bar');
+  const cov = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
+  const near = v.nearERBsFiltered || v.nearERBs;
+  bar.style.display = 'block';
+  document.getElementById('erb-bar-content').innerHTML = `
+    <div style="margin-bottom:4px">${v.placa}</div>
+    <div style="color:${cov ? '#10b981' : '#4b5563'};margin-bottom:4px">${cov ? '✓ Com cobertura' : '✗ Sem cobertura'}</div>
+    <div style="color:var(--text)">${near.length} ERBs em ${radiusKm}km</div>
+  `;
+}
+
+// ── List render ────────────────────────────────────────────────────────────────
+function renderList() {
+  const el = document.getElementById('vlist');
+  if (filteredV.length === 0) {
+    el.innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted);font-size:11px;font-family:var(--mono)">Nenhum veículo encontrado.</div>`;
+    return;
+  }
+
+  el.innerHTML = filteredV.slice(0, 80).map(v => {
+    const cat = { rec: 'rec', med: 'med', crit: 'crit' }[v.categoria];
+    const label = v.diasOffline + 'd';
+    const cov = v.hasCoverageFiltered !== undefined ? v.hasCoverageFiltered : v.hasCoverage;
+    return `
+      <div class="vcard ${selectedId === v.id ? 'sel' : ''}" onclick="focusV(${v.id}, ${v.lat}, ${v.lng})">
+        <div class="vcard-placa">${v.placa}</div>
+        <span class="badge-dias ${cat}">${label}</span>
+        <div class="vcard-meta">
+          <span style="color:${cov ? '#10b981' : '#4b5563'}">${cov ? '● Cobertura' : '○ Sem cob.'}</span>
+          <span>📅 ${v.dataParou || '—'}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function focusV(id, lat, lng) {
+  selectedId = id;
+  map.setView([lat, lng], 13);
+  markers.forEach(m => {
+    if (Math.abs(m.getLatLng().lat - lat) < 0.0005 && Math.abs(m.getLatLng().lng - lng) < 0.0005) {
+      m.openPopup();
+    }
+  });
+  renderList();
+}
+
+// ── Analytics ──────────────────────────────────────────────────────────────────
+function renderAnalytics() {
+  const el = document.getElementById('analytics-body');
+  if (allVeiculos.length === 0) return;
+
+  const crit = allVeiculos.filter(v => v.categoria === 'crit').length;
+  const med  = allVeiculos.filter(v => v.categoria === 'med').length;
+  const rec  = allVeiculos.filter(v => v.categoria === 'rec').length;
+  const withCov = allVeiculos.filter(v => v.hasCoverage).length;
+
+  const maxDias = Math.max(...allVeiculos.map(v => v.diasOffline));
+  const avgDias = Math.round(allVeiculos.reduce((s, v) => s + v.diasOffline, 0) / allVeiculos.length);
+
+  // Top municipios from ERBs
+  const byMun = {};
+  allERBs.forEach(e => { if (e.mun) byMun[e.mun] = (byMun[e.mun] || 0) + 1; });
+  const topMun = Object.entries(byMun).sort((a,b) => b[1]-a[1]).slice(0, 6);
+  const maxMun = topMun[0]?.[1] || 1;
+
+  const byOp = {};
+  allERBs.forEach(e => { if (e.op) byOp[e.op] = (byOp[e.op] || 0) + 1; });
+  const topOp = Object.entries(byOp).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  const maxOp = topOp[0]?.[1] || 1;
+
+  el.innerHTML = `
+    <div class="mcard">
+      <div class="mtitle">Frota Offline</div>
+      <div class="mval">${allVeiculos.length}</div>
+      <div class="msub">Máx: ${maxDias}d · Média: ${avgDias}d · Com cobertura: ${withCov}</div>
+    </div>
+    <div class="mcard">
+      <div class="mtitle">Por Criticidade</div>
+      <div class="bar-item"><div class="bar-lbl">Crítico</div><div class="bar-out"><div class="bar-in" style="width:${(crit/allVeiculos.length*100).toFixed(0)}%;background:#ef4444"></div></div><div class="bar-n">${crit}</div></div>
+      <div class="bar-item"><div class="bar-lbl">Médio</div><div class="bar-out"><div class="bar-in" style="width:${(med/allVeiculos.length*100).toFixed(0)}%;background:#f59e0b"></div></div><div class="bar-n">${med}</div></div>
+      <div class="bar-item"><div class="bar-lbl">Recente</div><div class="bar-out"><div class="bar-in" style="width:${(rec/allVeiculos.length*100).toFixed(0)}%;background:#3b82f6"></div></div><div class="bar-n">${rec}</div></div>
+    </div>
+    <div class="mcard">
+      <div class="mtitle">ERBs por Operadora (${allERBs.length} total)</div>
+      ${topOp.map(([op, n]) => `<div class="bar-item"><div class="bar-lbl">${op||'—'}</div><div class="bar-out"><div class="bar-in" style="width:${(n/maxOp*100).toFixed(0)}%"></div></div><div class="bar-n">${n}</div></div>`).join('')}
+    </div>
+    <div class="mcard">
+      <div class="mtitle">ERBs por Município</div>
+      ${topMun.map(([m, n]) => `<div class="bar-item"><div class="bar-lbl">${m||'—'}</div><div class="bar-out"><div class="bar-in" style="width:${(n/maxMun*100).toFixed(0)}%;background:linear-gradient(90deg,#8b5cf6,#3b82f6)"></div></div><div class="bar-n">${n}</div></div>`).join('')}
+    </div>`;
+}
+
+// ── Chip handlers ──────────────────────────────────────────────────────────────
+function chipOp(el) {
+  document.querySelectorAll('#chips-op .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  filterOp = el.dataset.val;
+  applyFilters();
+}
+
+function chipTec(el) {
+  document.querySelectorAll('#chips-tec .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  filterTec = el.dataset.val;
+  applyFilters();
+}
+
+function setDiasFiltro(v) {
+  filterDias = v;
+  ['all','rec','med','crit'].forEach(k => {
+    const el = document.getElementById('df-' + k);
+    if (el) el.classList.toggle('active', (k === 'all' && !v) || k === v);
+  });
+  applyFilters();
+}
+
+document.getElementById('f-placa').addEventListener('input', e => {
+  filterPlaca = e.target.value;
+  applyFilters();
+});
+
+// ── Radius & view ──────────────────────────────────────────────────────────────
+function updateRadius() {
+  radiusKm = parseInt(document.getElementById('radius-sl').value);
+  document.getElementById('radius-v').textContent = radiusKm;
+  // Recompute coverage
+  allVeiculos.forEach(v => {
+    v.nearERBs = allERBs.filter(e => haversine(v.lat, v.lng, e.lat, e.lng) <= radiusKm);
+    v.hasCoverage = v.nearERBs.length > 0;
+  });
+  applyFilters();
+}
+
+function setView(m) {
+  viewMode = m;
+  document.querySelectorAll('.vbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById('vm-' + m).classList.add('active');
+  renderVehicles();
+}
+
+function toggleERBs(on) {
+  erbVisible = on;
+  document.getElementById('erb-on').classList.toggle('active', on);
+  document.getElementById('erb-off').classList.toggle('active', !on);
+  renderERBLayer();
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!filteredV.length) { toast('Nenhum dado para exportar'); return; }
+  const rows = [['Placa','Latitude','Longitude','Data Parou','Dias Offline','Criticidade','Tem Cobertura','ERBs no Raio']];
+  filteredV.forEach(v => rows.push([
+    v.placa, v.lat.toFixed(6), v.lng.toFixed(6), v.dataParou, v.diasOffline,
+    v.categoria, v.hasCoverage ? 'Sim' : 'Não', v.nearERBs.length
+  ]));
+  const csv = rows.map(r => r.map(x => `"${x}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'frota-offline.csv';
+  a.click();
+  toast('📥 CSV exportado!');
+}
+
+function exportKML() {
+  if (!filteredV.length) { toast('Nenhum dado para exportar'); return; }
+  const placemarks = filteredV.map(v => `
+  <Placemark>
+    <name>${v.placa}</name>
+    <description>Dias offline: ${v.diasOffline} | Parou: ${v.dataParou} | Cobertura: ${v.hasCoverage ? 'Sim' : 'Não'}</description>
+    <Point><coordinates>${v.lng.toFixed(6)},${v.lat.toFixed(6)},0</coordinates></Point>
+  </Placemark>`).join('');
+  const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Frota Offline</name>${placemarks}</Document></kml>`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }));
+  a.download = 'frota-offline.kml';
+  a.click();
+  toast('🗺️ KML exportado!');
+}
+
+// ── Tab ────────────────────────────────────────────────────────────────────────
+function tab(name) {
+  const names = ['filters','list','analytics'];
+  document.querySelectorAll('.sb-tab').forEach((t, i) => t.classList.toggle('active', names[i] === name));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'analytics') renderAnalytics();
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dL = (lat2 - lat1) * Math.PI / 180;
+  const dG = (lng2 - lng1) * Math.PI / 180;
+  const a  = Math.sin(dL/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dG/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+function parseCoord(raw) {
+  if (!raw) return NaN;
+  let s = String(raw).trim().replace(',', '.');
+  let n = parseFloat(s);
+  if (isNaN(n)) return NaN;
+  if (Math.abs(n) > 90) {
+    for (let i = 1; i <= 4; i++) {
+      const t = n / Math.pow(10, i);
+      if (Math.abs(t) <= 90) { n = t; break; }
+    }
+  }
+  return n;
+}
+
+function setStatus(msg) { document.getElementById('import-status').textContent = msg; }
+
+let _tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+initMap();
 </script>
 </body>
 </html>
